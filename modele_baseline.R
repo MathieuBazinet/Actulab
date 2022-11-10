@@ -168,3 +168,100 @@ pred_rate_logit
 
 
 #### GRAPHIQUES POUR LA CATÉGORIE D'ÂGE
+
+################################################################################
+# Parité démographique
+# P(\hat{Y}=1 | S=s) = P(\hat{Y}=1 |S!=s) pour tout y, A et b
+################################################################################
+dem_parity_logit = dem_parity(
+  data    = test, 
+  outcome = 'clm',
+  outcome_base = '0',
+  group   = 'agecat',
+  base    = '1',
+  probs   = 'probs_logit', 
+  cutoff  = mean(test$probs_logit)) # TODO : comment choisir un bon cutoff? prendre la moyenne est le genre de cutoff qu'on prend en analyse discriminante (linéaire) à deux classes...
+
+dem_parity_xgb = equal_odds(
+  data    = test, 
+  outcome = 'clm',
+  outcome_base = '0',
+  group   = 'agecat',
+  base    = '1',
+  probs   = 'probs_xgb', 
+  cutoff  = mean(test$probs_xgb))
+
+dem_parity_xgb$Metric_plot + ggtitle("Égalité des chances avec XGBoost")
+dem_parity_logit$Metric_plot + ggtitle("Égalité des chances avec la régression logistique") # inéquitable
+
+dem_parity_logit
+
+################################################################################
+# Égalité de l'exactitude
+# P(\hat{Y}=y | S=s) = P(\hat{Y}=y |S!=s) pour tout y, A et b
+################################################################################
+# Tremblay, 2021 dit qu'il est préférable d'utiliser le taux de faux positifs et de faux négatifs en complément
+
+acc_parity_logit = acc_parity(
+  data    = test, 
+  outcome = 'clm',
+  outcome_base = '0',
+  group   = 'agecat',
+  base    = '1',
+  probs   = 'probs_logit', 
+  cutoff  = mean(test$probs_logit)) # TODO : comment choisir un bon cutoff?
+
+fnr_parity_logit = fnr_parity(
+  data    = test, 
+  outcome = 'clm',
+  outcome_base = '0',
+  group   = 'agecat',
+  base    = '1',
+  probs   = 'probs_logit', 
+  cutoff  = mean(test$probs_logit)) # TODO : comment choisir un bon cutoff?
+
+fpr_parity_logit = fpr_parity(
+  data    = test, 
+  outcome = 'clm',
+  outcome_base = '0',
+  group   = 'agecat',
+  base    = '1',
+  probs   = 'probs_logit', 
+  cutoff  = mean(test$probs_logit)) # TODO : comment choisir un bon cutoff?
+
+
+acc_parity_logit
+fnr_parity_logit
+fpr_parity_logit
+
+################################################################################
+# Égalité des chances
+# P(\hat{Y}=1 | Y=1,A=a) = P(\hat{Y}=1 | Y=1,A=B) pour tout a,b
+################################################################################
+
+equal_odds_logit = equal_odds(
+  data    = test, 
+  outcome = 'clm',
+  outcome_base = '0',
+  group   = 'agecat',
+  base    = '1',
+  probs   = 'probs_logit', 
+  cutoff  = mean(test$probs_logit)) # TODO : comment choisir un bon cutoff?
+
+equal_odds_logit
+equal_odds_logit$Metric_plot + ggtitle("Égalité des chances avec la régression logistique")
+
+################################################################################
+# Égalité de la précision
+# P(Y=1 | \hat{Y}=1,A=a) = P(Y=1 | \hat{Y}=1,A=b) pour tout A et b
+################################################################################
+pred_rate_logit = pred_rate_parity(
+  data    = test, 
+  outcome = 'clm',
+  outcome_base = '0',
+  group   = 'agecat',
+  base    = '1',
+  probs   = 'probs_logit', 
+  cutoff  = mean(test$probs_logit)) # TODO : comment choisir un bon cutoff?
+
+pred_rate_logit
