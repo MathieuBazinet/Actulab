@@ -49,10 +49,6 @@ class FairnessAwareModel:
         return np.array(X @ self.beta + np.log(self.offset)) # equivalent de faire values
 
     def log_vraisemblance_poisson(self, X, y):
-        #QUESTION : à quoi ça sert de faire reshape? À part nous forcer à travailler avec des numpy arrays? car
-        #print(np.sum(y_train.values.reshape(-1,1) * lin_predictor.values.rshape(-1,1) - np.exp(lin_predictor.values.reshape(-1,1))))
-        #print(np.sum(y_train * lin_predictor - np.exp(lin_predictor)))
-        # me donnent la même chose
         lin_predictor = self.beta_dot(X).reshape(-1, 1)
         y = y.reshape(-1, 1)
         yx = np.sum(y * lin_predictor - np.exp(lin_predictor))
@@ -68,11 +64,11 @@ class FairnessAwareModel:
 
     def penalized_loss(self, beta):
         self.beta = beta
-        self.beta = self.beta / np.linalg.norm(self.beta) # TODO : nécessaire?
+        self.beta = self.beta / np.linalg.norm(self.beta)
         print(self.beta)
 
         if self.family=="poisson":
-            log_vraisemblance = self.log_vraisemblance_poisson(self.X, self.y)
+            log_vraisemblance = self.log_vraisemblance_poisson(self.X, self.y) # TODO : self.X ne doit pas contenir les attributs protégés car le modèle ne doit pas être entraîné avec
         elif self.family=="binomial":
             log_vraisemblance = -self.log_vraisemblance_binomial(self.X, self.y)
         else:
@@ -83,7 +79,7 @@ class FairnessAwareModel:
             s = self.protected_attributes[s_index]
             predict_list = []
             regularization_parameter = self.regularization[s_index]
-            for a in np.unique(self.X[:, s]):
+            for a in np.unique(self.X[:, s]): # TODO mais on en a besoin ici... est-ce qu'on pourrait donner les colonnes des attributs protégés directement au lieu de l'index comme argument?
                 X_a = self.X
                 X_a[:, s] = a
                 predict_list.append(self.predict(X_a, type="response"))
@@ -93,6 +89,7 @@ class FairnessAwareModel:
         return -log_vraisemblance + loss
 
     def fit(self, X_train, y_train):
+
         self.X = X_train
         self.y = y_train
         if self.beta_init is None:
@@ -103,8 +100,6 @@ class FairnessAwareModel:
 
 
         #TODO : QUESTION : pourquoi on normalise les betas? 
-        # Je comprends que d'un point de vue numérique c'est fait dans les réseaux de neurones, mais si on fait ça 
-        # les betas en sortie ne seront pas les bons (interprétation ne sera pas correcte)...
         # statsmodel utilise la fonction scipy.opimize.fmin_bfgs (qui revient à utiliser scipy.optimize.minimize(method="BFGS")), 
         # mais je ne pense pas qu'ils font une division (https://github.com/statsmodels/statsmodels/blob/main/statsmodels/base/optimizer.py#L478)
         self.beta = res.x
@@ -132,5 +127,4 @@ class FairnessAwareModel:
 
 if __name__ == "__main__":
     print("hello world")
-    #TODO : vérifier que le code fonctionne (régression logistique)
     #TODO : comparer l'output de la régression logistique avec un modèle de statsmodel
