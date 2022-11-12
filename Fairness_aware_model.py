@@ -9,11 +9,10 @@ class FairnessAwareModel:
 
     def __init__(self, regularization, protected_attributes, offset=None, beta_init=None, family="binomial", seed=42):
         """
+        La fonction de lien utilisée est le lien canonique. Pour régression poisson : lien log. Pour régression binomiale : logit.
         family (default="binomial") : "poisson" ou "binomial"
         """
         # On verra si on a besoin de random states mais je les mets là au cas où
-
-        #TODO je rajouterais un paramètre "loi" \in Poisson, logistique, et "link" = "log" pour être plus général
 
         # On crée une liste d'attributs protégés
         if not isinstance(protected_attributes, list):
@@ -99,6 +98,12 @@ class FairnessAwareModel:
         if self.offset is None:
             self.offset = np.ones(X_train.shape[0])
         res = minimize(self.penalized_loss, self.beta_init, method='BFGS', options={'maxiter': 500})
+
+        #TODO : QUESTION : pourquoi on normalise les betas? 
+        # Je comprends que d'un point de vue numérique c'est fait dans les réseaux de neurones, mais si on fait ça 
+        # les betas en sortie ne seront pas les bons (interprétation ne sera pas correcte)...
+        # statsmodel utilise la fonction scipy.opimize.fmin_bfgs (qui revient à utiliser scipy.optimize.minimize(method="BFGS")), 
+        # mais je ne pense pas qu'ils font une division (https://github.com/statsmodels/statsmodels/blob/main/statsmodels/base/optimizer.py#L478)
         self.beta = res.x
         self.beta = self.beta / np.linalg.norm(self.beta)
         self.beta_init = self.beta
@@ -113,9 +118,9 @@ class FairnessAwareModel:
         predicted_x = self.beta_dot(X).reshape(-1, 1)
 
         if type=="linear":
-            prediction = np.matmult(self.beta,X) # TODO : probablement une erreur, il faut que self.beta soit une matrice
+            prediction = predicted_x
         else:
-            prediction = 1/(1+np.exp(-predicted_X))
+            prediction = 1/(1+np.exp(-predicted_x))
         
         return prediction
 
