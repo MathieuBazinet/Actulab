@@ -46,33 +46,35 @@ class FairnessAwareModel:
     def beta_dot(self, X):
         if self.beta is None or self.offset is None:
             raise RuntimeError("The model was not fitted on the data.")
-        return X @ self.beta + np.log(self.offset)
-
-    def predict(self, X):
-        return np.exp(self.beta_dot(X))
+        return np.array(X @ self.beta + np.log(self.offset)) # equivalent de faire values
 
     def log_vraisemblance_poisson(self, X, y):
-        predicted_x = self.beta_dot(X).reshape(-1, 1)
+        #QUESTION : à quoi ça sert de faire reshape? À part nous forcer à travailler avec des numpy arrays? car
+        #print(np.sum(y_train.values.reshape(-1,1) * lin_predictor.values.rshape(-1,1) - np.exp(lin_predictor.values.reshape(-1,1))))
+        #print(np.sum(y_train * lin_predictor - np.exp(lin_predictor)))
+        # me donnent la même chose
+        lin_predictor = self.beta_dot(X).reshape(-1, 1)
         y = y.reshape(-1, 1)
-        yx = np.sum(y * predicted_x - np.exp(predicted_x))
+        yx = np.sum(y * lin_predictor - np.exp(lin_predictor))
         c = np.sum(-np.log(factorial(y)))
         return yx + c
     
-    def log_vraisemblance_binomial(self, X, y_):
+    def log_vraisemblance_binomial(self, X, y):
+        print("calcul vraisemblance logistique")
         # Diapos 35/50 chapitre 2
-        predicted_x = self.beta_dot(X).reshape(-1, 1)
-        pi = 1/(1+exp(-1*predicted_x))
+        lin_predictor = self.beta_dot(X).reshape(-1, 1)
+        pi = 1/(1+np.exp(-lin_predictor))
         return np.sum(y * (np.log(pi) - np.log(1-pi)) + np.log(1-pi) )
 
     def penalized_loss(self, beta):
         self.beta = beta
-        self.beta = self.beta / np.linalg.norm(self.beta)
+        self.beta = self.beta / np.linalg.norm(self.beta) # TODO : nécessaire?
         print(self.beta)
 
         if self.family=="poisson":
             log_vraisemblance = self.log_vraisemblance_poisson(self.X, self.y)
         elif self.family=="binomial":
-            log_vraisemblance = self.log_vraisemblance_binomial(self.X, self.y)
+            log_vraisemblance = -self.log_vraisemblance_binomial(self.X, self.y)
         else:
             raise NotImplementedError
 
@@ -84,10 +86,10 @@ class FairnessAwareModel:
             for a in np.unique(self.X[:, s]):
                 X_a = self.X
                 X_a[:, s] = a
-                predict_list.append(self.predict(X_a))
+                predict_list.append(self.predict(X_a, type="response"))
             for i in range(len(predict_list)):
                 for j in range(i, len(predict_list)):
-                    loss += regularization_parameter * np.sum((predict_list[i] - predict_list[j])**2)
+                    loss += regularization_parameter * np.sum((predict_list[i] - predict_list[j])**2) 
         return -log_vraisemblance + loss
 
     def fit(self, X_train, y_train):
@@ -98,6 +100,7 @@ class FairnessAwareModel:
         if self.offset is None:
             self.offset = np.ones(X_train.shape[0])
         res = minimize(self.penalized_loss, self.beta_init, method='BFGS', options={'maxiter': 500})
+
 
         #TODO : QUESTION : pourquoi on normalise les betas? 
         # Je comprends que d'un point de vue numérique c'est fait dans les réseaux de neurones, mais si on fait ça 
@@ -115,12 +118,15 @@ class FairnessAwareModel:
             X (np.array): matrice des données en format one-hot
             type (str, optional): Retourne la prédiction. "response" pour la probabilité. "value" pour 1/0 (si logistique), "linear" pour le prédicteur linéaire (B^tX) Defaults to "response".
         """
-        predicted_x = self.beta_dot(X).reshape(-1, 1)
+        lin_predictor = self.beta_dot(X).reshape(-1, 1) # TODO : reshape ou non?
 
         if type=="linear":
-            prediction = predicted_x
+            prediction = lin_predictor
         else:
-            prediction = 1/(1+np.exp(-predicted_x))
+            if self.family == "binomial":
+                prediction = 1/(1+np.exp(-lin_predictor))
+            elif self.family == "poisson":
+                prediction = np.exp(lin_predictor)
         
         return prediction
 
