@@ -7,8 +7,13 @@ from sklearn.utils import check_random_state
 
 class FairnessAwareModel:
 
-    def __init__(self, regularization, protected_attributes, offset=None, beta_init=None,  seed=42):
+    def __init__(self, regularization, protected_attributes, offset=None, beta_init=None, family="binomial", seed=42):
+        """
+        family (default="binomial") : "poisson" ou "binomial"
+        """
         # On verra si on a besoin de random states mais je les mets là au cas où
+
+        #TODO je rajouterais un paramètre "loi" \in Poisson, logistique, et "link" = "log" pour être plus général
 
         # On crée une liste d'attributs protégés
         if not isinstance(protected_attributes, list):
@@ -30,6 +35,14 @@ class FairnessAwareModel:
         self.beta = None
         self.beta_init = beta_init
         self.offset = offset
+        self.family = family
+        
+        #TODO : pas sûr que je vais m'en servir
+        if self.family=="poisson":
+            link="log"
+        elif self.family=="binomial":
+            link="logit"
+        self.link=link
 
     def beta_dot(self, X):
         if self.beta is None or self.offset is None:
@@ -45,12 +58,25 @@ class FairnessAwareModel:
         yx = np.sum(y * predicted_x - np.exp(predicted_x))
         c = np.sum(-np.log(factorial(y)))
         return yx + c
+    
+    def log_vraisemblance_binomial(self, X, y_):
+        # Diapos 35/50 chapitre 2
+        predicted_x = self.beta_dot(X).reshape(-1, 1)
+        pi = 1/(1+exp(-1*predicted_x))
+        return np.sum(y * (np.log(pi) - np.log(1-pi)) + np.log(1-pi) )
 
     def penalized_loss(self, beta):
         self.beta = beta
         self.beta = self.beta / np.linalg.norm(self.beta)
         print(self.beta)
-        log_vraisemblance = self.log_vraisemblance_poisson(self.X, self.y)
+
+        if self.family=="poisson":
+            log_vraisemblance = self.log_vraisemblance_poisson(self.X, self.y)
+        elif self.family=="binomial":
+            log_vraisemblance = self.log_vraisemblance_binomial(self.X, self.y)
+        else:
+            raise NotImplementedError
+
         loss = 0
         for s_index in range(len(self.protected_attributes)):
             s = self.protected_attributes[s_index]
@@ -77,6 +103,23 @@ class FairnessAwareModel:
         self.beta = self.beta / np.linalg.norm(self.beta)
         self.beta_init = self.beta
 
+    def predict(self, X, type="response"):
+        """Prédiction de la variable réponse pour une matrice X donnée.
+
+        Args:
+            X (np.array): matrice des données en format one-hot
+            type (str, optional): Retourne la prédiction. "response" pour la probabilité. "value" pour 1/0 (si logistique), "linear" pour le prédicteur linéaire (B^tX) Defaults to "response".
+        """
+        predicted_x = self.beta_dot(X).reshape(-1, 1)
+
+        if type=="linear":
+            prediction = np.matmult(self.beta,X) # TODO : probablement une erreur, il faut que self.beta soit une matrice
+        else:
+            prediction = 1/(1+np.exp(-predicted_X))
+        
+        return prediction
 
 if __name__ == "__main__":
     print("hello world")
+    #TODO : vérifier que le code fonctionne (régression logistique)
+    #TODO : comparer l'output de la régression logistique avec un modèle de statsmodel
