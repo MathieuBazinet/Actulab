@@ -12,6 +12,19 @@ df = df %>%
   )
 
 ################################################################################
+# Train-test spit et exporter les données pour Python
+################################################################################
+
+library(caTools)
+set.seed(42)
+sample = sample.split(df$clm, SplitRatio = .8)
+train = subset(df, sample == TRUE)
+test  = subset(df, sample == FALSE)
+
+df$train = sample
+#write.csv(df, "dataCar_clean.csv",row.names=FALSE)
+
+################################################################################
 # Statistiques descriptives
 ################################################################################
 
@@ -31,12 +44,6 @@ round(df$numclaims %>% table() %>% prop.table()*100,2) %>% cumsum()
 # Régression logistique
 ################################################################################
 formule = formula(clm~veh_value+veh_body+veh_age+area)
-
-library(caTools)
-set.seed(42)
-sample = sample.split(df$clm, SplitRatio = .8)
-train = subset(df, sample == TRUE)
-test  = subset(df, sample == FALSE)
 
 logistique = glm(formule, family=binomial(link="logit"), data=train)
 summary(logistique)
