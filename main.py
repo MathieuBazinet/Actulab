@@ -21,6 +21,7 @@ dataCar['area'].replace(to_replace=np.unique(dataCar['area']), inplace=True, val
 
 data = dataCar.values
 protected_attributes = [np.where(dataCar.columns.values == i)[0][0] for i in protected_attributes]
+np.cov(data[:,protected_attributes[0]], numclaim)
 
 fam = FairnessAwareModel(regularization=0.1, protected_attributes=protected_attributes)
 fam.fit(data, numclaim)

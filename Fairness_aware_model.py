@@ -46,7 +46,13 @@ class FairnessAwareModel:
         c = np.sum(-np.log(factorial(y)))
         return yx + c
 
-    def penalized_loss(self, beta):
+    def penalized_loss_1(self, beta):
+        """
+        Idée : minimiser x_i^{A=a} - x_i^{A=b}
+        Problème : Solution "optimale" donnerait simplement beta_A = 0
+        :param beta:
+        :return:
+        """
         self.beta = beta
         self.beta = self.beta / np.linalg.norm(self.beta)
         print(self.beta)
@@ -65,6 +71,30 @@ class FairnessAwareModel:
                     loss += regularization_parameter * np.sum((predict_list[i] - predict_list[j])**2)
         return -log_vraisemblance + loss
 
+    def penalized_loss_2(self, beta):
+        """
+        Idée : probabilité que \hat{Y} = 1 sachant A=a (equalized odds)
+        :param beta:
+        :return:
+        """
+        self.beta = beta
+        self.beta = self.beta / np.linalg.norm(self.beta)
+        print(self.beta)
+        log_vraisemblance = self.log_vraisemblance_poisson(self.X, self.y)
+        loss = 0
+        for s_index in range(len(self.protected_attributes)):
+            s = self.protected_attributes[s_index]
+            values = np.unique(self.X[:, s_index])
+            regularization_parameter = self.regularization[s_index]
+            predict_list = []
+            for v in values:
+                index = np.where(self.X[:,s_index] == v)[0]
+                predict_list.append(np.sum(self.predict(self.X[:, index]) * self.y[index]) / np.sum(self.y[index]))
+            for i in range(len(predict_list)):
+                for j in range(i, len(predict_list)):
+                    loss += regularization_parameter * np.sum((predict_list[i] - predict_list[j])**2)
+        return -log_vraisemblance + loss
+
     def fit(self, X_train, y_train):
         self.X = X_train
         self.y = y_train
@@ -72,7 +102,7 @@ class FairnessAwareModel:
             self.beta_init = np.ones(X_train.shape[1]) / X_train.shape[1]
         if self.offset is None:
             self.offset = np.ones(X_train.shape[0])
-        res = minimize(self.penalized_loss, self.beta_init, method='BFGS', options={'maxiter': 500})
+        res = minimize(self.penalized_loss_1, self.beta_init, method='BFGS', options={'maxiter': 500})
         self.beta = res.x
         self.beta = self.beta / np.linalg.norm(self.beta)
         self.beta_init = self.beta
