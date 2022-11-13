@@ -57,16 +57,14 @@ class FairnessAwareModel:
         return yx + c
     
     def log_vraisemblance_binomial(self, X, y):
-        print("calcul vraisemblance logistique")
         # Diapos 35/50 chapitre 2
         lin_predictor = self.beta_dot(X).reshape(-1, 1)
         pi = 1/(1+np.exp(-lin_predictor))
-        return np.sum(y * (np.log(pi) - np.log(1-pi)) + np.log(1-pi) )
+        return np.sum(y.reshape(-1,1) * (np.log(pi) - np.log(1-pi)) + np.log(1-pi) )
 
     def penalized_loss(self, beta):
         self.beta = beta
         #self.beta = self.beta / np.linalg.norm(self.beta)
-        print(self.beta)
 
         if self.family=="poisson":
             log_vraisemblance = self.log_vraisemblance_poisson(self.X, self.y)
