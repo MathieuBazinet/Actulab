@@ -43,7 +43,7 @@ round(df$numclaims %>% table() %>% prop.table()*100,2) %>% cumsum()
 ################################################################################
 # Régression logistique
 ################################################################################
-formule = formula(clm~veh_value+veh_body+veh_age+area)
+formule = formula(clm~veh_value+veh_body+veh_age+area+gender+agecat)
 
 logistique = glm(formule, family=binomial(link="logit"), data=train)
 summary(logistique)
@@ -55,11 +55,11 @@ test$probs_logit = predict(logistique, newdata=test, type="response")
 ################################################################################
 library(xgboost)
 library(Matrix)
-train_matrix = sparse.model.matrix(~clm+veh_value+veh_body+veh_age+area, data=train) # sparse.model.matrix ou model.matrix
+train_matrix = sparse.model.matrix(~clm+veh_value+veh_body+veh_age+area+gender+agecat, data=train) # sparse.model.matrix ou model.matrix
 
 xgb <- xgboost(data = train_matrix, label = train$clm, max.depth = 2, eta = 1, nthread = 2, nrounds = 2, objective = "binary:logistic")
 
-test_matrix = sparse.model.matrix(~clm+veh_value+veh_body+veh_age+area, data=test)
+test_matrix = sparse.model.matrix(~clm+veh_value+veh_body+veh_age+area+gender+agecat, data=test)
 
 test$probs_xgb = predict(xgb, test_matrix, type="response")
 
@@ -77,6 +77,8 @@ hist(test$probs_logit)
 # Parité démographique
 # P(\hat{Y}=1 | S=s) = P(\hat{Y}=1 |S!=s) pour tout y, A et b
 ################################################################################
+library(fairness)
+
 dem_parity_logit = dem_parity(
   data    = test, 
   outcome = 'clm',
@@ -140,8 +142,6 @@ fpr_parity_logit
 # Égalité des chances
 # P(\hat{Y}=1 | Y=1,A=a) = P(\hat{Y}=1 | Y=1,A=B) pour tout a,b
 ################################################################################
-library(fairness)
-
 # égalité des chances (equal_odds dans la librairie)
 mean_F = mean(test$probs_logit[test$gender=="F"])
 mean_M = mean(test$probs_logit[test$gender=="M"])

@@ -33,6 +33,7 @@ class FairnessAwareModel:
         self.np_random_state = np.random.RandomState(seed)
         self.beta = None
         self.beta_init = beta_init
+        #TODO : initialiser les betas aux valeurs du MLE?
         self.offset = offset
         self.family = family
         
@@ -64,28 +65,29 @@ class FairnessAwareModel:
 
     def penalized_loss(self, beta):
         self.beta = beta
-        self.beta = self.beta / np.linalg.norm(self.beta)
+        #self.beta = self.beta / np.linalg.norm(self.beta)
         print(self.beta)
 
         if self.family=="poisson":
-            log_vraisemblance = self.log_vraisemblance_poisson(self.X, self.y) # TODO : self.X ne doit pas contenir les attributs protégés car le modèle ne doit pas être entraîné avec
+            log_vraisemblance = self.log_vraisemblance_poisson(self.X, self.y)
         elif self.family=="binomial":
             log_vraisemblance = -self.log_vraisemblance_binomial(self.X, self.y)
         else:
             raise NotImplementedError
 
         loss = 0
-        for s_index in range(len(self.protected_attributes)):
-            s = self.protected_attributes[s_index]
-            predict_list = []
-            regularization_parameter = self.regularization[s_index]
-            for a in np.unique(self.X[:, s]): # TODO mais on en a besoin ici... est-ce qu'on pourrait donner les colonnes des attributs protégés directement au lieu de l'index comme argument?
-                X_a = self.X
-                X_a[:, s] = a
-                predict_list.append(self.predict(X_a, type="response"))
-            for i in range(len(predict_list)):
-                for j in range(i, len(predict_list)):
-                    loss += regularization_parameter * np.sum((predict_list[i] - predict_list[j])**2) 
+        ### je commente pour simplement voir si la vraisemblance sans pénalisation est ok
+        # for s_index in range(len(self.protected_attributes)):
+        #     s = self.protected_attributes[s_index]
+        #     predict_list = []
+        #     regularization_parameter = self.regularization[s_index]
+        #     for a in np.unique(self.X[:, s]):
+        #         X_a = self.X
+        #         X_a[:, s] = a
+        #         predict_list.append(self.predict(X_a, type="response"))
+        #     for i in range(len(predict_list)):
+        #         for j in range(i, len(predict_list)):
+        #             loss += regularization_parameter * np.sum((predict_list[i] - predict_list[j])**2) 
         return -log_vraisemblance + loss
 
     def fit(self, X_train, y_train):
@@ -96,14 +98,10 @@ class FairnessAwareModel:
             self.beta_init = np.ones(X_train.shape[1]) / X_train.shape[1]
         if self.offset is None:
             self.offset = np.ones(X_train.shape[0])
-        res = minimize(self.penalized_loss, self.beta_init, method='BFGS', options={'maxiter': 500})
+        res = minimize(self.penalized_loss, self.beta_init, method='BFGS', options={'maxiter': 500, 'disp': True})
 
-
-        #TODO : QUESTION : pourquoi on normalise les betas? 
-        # statsmodel utilise la fonction scipy.opimize.fmin_bfgs (qui revient à utiliser scipy.optimize.minimize(method="BFGS")), 
-        # mais je ne pense pas qu'ils font une division (https://github.com/statsmodels/statsmodels/blob/main/statsmodels/base/optimizer.py#L478)
         self.beta = res.x
-        self.beta = self.beta / np.linalg.norm(self.beta)
+        #self.beta = self.beta / np.linalg.norm(self.beta)
         self.beta_init = self.beta
 
     def predict(self, X, type="response"):
