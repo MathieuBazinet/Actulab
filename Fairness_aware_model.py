@@ -136,12 +136,9 @@ class FairnessAwareModel:
 
         if self.offset is None:
             self.offset = np.ones(X_train.shape[0])
-<<<<<<< HEAD
-        res = minimize(self.penalized_loss_1, self.beta_init, method='BFGS', options={'maxiter': 500})
-=======
-        res = minimize(self.penalized_loss, self.beta_init, method='BFGS', options={'maxiter': 500, 'disp': True})
 
->>>>>>> 088987968e8be6148ed2bb917c2be98f54915ba6
+        res = minimize(self.penalized_loss_1, self.beta_init, method='BFGS', options={'maxiter': 500})
+        res = minimize(self.penalized_loss, self.beta_init, method='BFGS', options={'maxiter': 500, 'disp': True})
         self.beta = res.x
         #self.beta = self.beta / np.linalg.norm(self.beta)
         self.beta_init = self.beta
