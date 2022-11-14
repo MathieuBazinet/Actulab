@@ -3,6 +3,7 @@ from scipy.optimize import minimize
 from scipy.special import factorial
 import pandas as pd
 from sklearn.utils import check_random_state
+import statsmodels.api as sm
 
 
 class FairnessAwareModel:
@@ -47,7 +48,7 @@ class FairnessAwareModel:
     def beta_dot(self, X):
         if self.beta is None or self.offset is None:
             raise RuntimeError("The model was not fitted on the data.")
-        return np.array(X @ self.beta + np.log(self.offset)) # equivalent de faire values
+        return  X @ self.beta + np.log(self.offset) # equivalent de faire values
 
     def log_vraisemblance_poisson(self, X, y):
         lin_predictor = self.beta_dot(X).reshape(-1, 1)
@@ -60,7 +61,10 @@ class FairnessAwareModel:
         # Diapos 35/50 chapitre 2
         lin_predictor = self.beta_dot(X).reshape(-1, 1)
         pi = 1/(1+np.exp(-lin_predictor))
-        return np.sum(y.reshape(-1,1) * (np.log(pi) - np.log(1-pi)) + np.log(1-pi) )
+        #return np.sum(y.reshape(-1,1) * (np.log(pi) - np.log(1-pi)) + np.log(1-pi) )
+        #return np.sum(y.reshape(-1,1) * lin_predictor - lin_predictor - np.log(1+np.exp(-lin_predictor)))
+        return np.sum(y.reshape(-1,1) * lin_predictor - np.log(1+np.exp(lin_predictor)))
+        #return np.sum(np.log(y.reshape(-1,1) * pi + (1-y).reshape(-1,1)*(1-pi))) # https://matthew-brett.github.io/cfd2020/more-regression/logistic_convexity.html
 
     def penalized_loss(self, beta):
         self.beta = beta
@@ -92,8 +96,16 @@ class FairnessAwareModel:
 
         self.X = X_train
         self.y = y_train
+
         if self.beta_init is None:
             self.beta_init = np.ones(X_train.shape[1]) / X_train.shape[1]
+            #self.beta_init = np.ones(X_train.shape[1])
+            #self.beta_init = np.zeros(X_train.shape[1]) / X_train.shape[1]
+            #self.beta_init = np.random.rand(X_train.shape[1])
+            # essai de "warm start"...
+            reference_model = sm.Logit(y_train, X_train).fit()
+            self.beta_init = reference_model.params
+
         if self.offset is None:
             self.offset = np.ones(X_train.shape[0])
         res = minimize(self.penalized_loss, self.beta_init, method='BFGS', options={'maxiter': 500, 'disp': True})
@@ -109,7 +121,7 @@ class FairnessAwareModel:
             X (np.array): matrice des données en format one-hot
             type (str, optional): Retourne la prédiction. "response" pour la probabilité. "value" pour 1/0 (si logistique), "linear" pour le prédicteur linéaire (B^tX) Defaults to "response".
         """
-        lin_predictor = self.beta_dot(X).reshape(-1, 1) # TODO : reshape ou non?
+        lin_predictor = self.beta_dot(X).reshape(-1, 1)
 
         if type=="linear":
             prediction = lin_predictor
