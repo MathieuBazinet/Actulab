@@ -73,7 +73,7 @@ class FairnessAwareModel:
         if self.family=="poisson":
             log_vraisemblance = self.log_vraisemblance_poisson(self.X, self.y)
         elif self.family=="binomial":
-            log_vraisemblance = -self.log_vraisemblance_binomial(self.X, self.y)
+            log_vraisemblance = self.log_vraisemblance_binomial(self.X, self.y)
         else:
             raise NotImplementedError
 
@@ -90,7 +90,7 @@ class FairnessAwareModel:
         #     for i in range(len(predict_list)):
         #         for j in range(i, len(predict_list)):
         #             loss += regularization_parameter * np.sum((predict_list[i] - predict_list[j])**2) 
-        return -log_vraisemblance + loss
+        return -1*log_vraisemblance + loss
 
     def fit(self, X_train, y_train):
 
@@ -99,12 +99,10 @@ class FairnessAwareModel:
 
         if self.beta_init is None:
             self.beta_init = np.ones(X_train.shape[1]) / X_train.shape[1]
-            #self.beta_init = np.ones(X_train.shape[1])
-            #self.beta_init = np.zeros(X_train.shape[1]) / X_train.shape[1]
             #self.beta_init = np.random.rand(X_train.shape[1])
-            # essai de "warm start"...
-            reference_model = sm.Logit(y_train, X_train).fit()
-            self.beta_init = reference_model.params
+            ## essai de "warm start"...
+            #reference_model = sm.Logit(y_train, X_train).fit()
+            #self.beta_init = reference_model.params
 
         if self.offset is None:
             self.offset = np.ones(X_train.shape[0])
