@@ -19,10 +19,11 @@ dataCar['gender'].replace(to_replace=np.unique(dataCar['gender']), inplace=True,
 dataCar['veh_body'].replace(to_replace=np.unique(dataCar['veh_body']), inplace=True, value=range(np.unique(dataCar['veh_body']).shape[0]))
 dataCar['area'].replace(to_replace=np.unique(dataCar['area']), inplace=True, value=range(np.unique(dataCar['area']).shape[0]))
 
-data = dataCar.values
-protected_attributes = [np.where(dataCar.columns.values == i)[0][0] for i in protected_attributes]
-np.cov(data[:,protected_attributes[0]], numclaim)
+protected_values = dataCar[protected_attributes].values
 
-fam = FairnessAwareModel(regularization=0.1, protected_attributes=protected_attributes)
+data = dataCar.drop(protected_attributes,axis=1).values
+
+fam = FairnessAwareModel(regularization=100, protected_values=protected_values, family="poisson")
+fam.fit(data, numclaim)
 fam.fit(data, numclaim)
 results = fam.predict(data)
