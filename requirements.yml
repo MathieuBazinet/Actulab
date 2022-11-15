@@ -1,0 +1,8 @@
+name: actulab
+channels:
+  - defaults
+dependencies:
+  - anaconda
+  - numpy
+  - scipy
+prefix: /home/simon/anaconda3/envs/actulab
