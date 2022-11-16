@@ -23,7 +23,13 @@ protected_values = dataCar[protected_attributes].values
 
 data = dataCar.drop(protected_attributes,axis=1).values
 
-fam = FairnessAwareModel(regularization=100, protected_values=protected_values, family="poisson")
-fam.fit(data, numclaim)
-fam.fit(data, numclaim)
-results = fam.predict(data)
+fam_poisson = FairnessAwareModel(regularization=100, protected_values=protected_values, family="poisson")
+fam_poisson.fit(data, binary_answer)
+# fam_poisson.fit(data, numclaim)
+results = fam_poisson.predict(data)
+
+# fam_gamma = FairnessAwareModel(regularization=100, protected_values=protected_values, family="gamma", alpha=2)
+# fam_gamma.fit(data, reg_claim)
+# fam_gamma.fit(data, reg_claim)
+# # fam.fit(data, reg_claim)
+# results = fam_gamma.predict(data)
