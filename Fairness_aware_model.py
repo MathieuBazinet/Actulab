@@ -133,7 +133,7 @@ class FairnessAwareModel:
                                             / np.sum(new_y[self.subset]))
                 for i in range(len(predict_list)):
                     for j in range(i+1, len(predict_list)):
-                        loss += regularization_parameter * np.sum((predict_list[i] - predict_list[j])**2)
+                        loss += regularization_parameter * np.abs(predict_list[i] - predict_list[j])
         self.predict_on_subset = False
         return -log_vraisemblance + loss
 
@@ -158,7 +158,7 @@ class FairnessAwareModel:
                 predict_list.append(somme)
             for i in range(len(predict_list)):
                 for j in range(i+1, len(predict_list)):
-                    loss += regularization_parameter * (predict_list[i] - predict_list[j])**2
+                    loss += regularization_parameter * np.abs(predict_list[i] - predict_list[j])
         self.predict_on_subset = False
         return -log_vraisemblance + loss
 
