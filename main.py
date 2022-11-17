@@ -1,35 +1,81 @@
 import numpy as np
 import pandas as pd
 from Fairness_aware_model import FairnessAwareModel
+from os.path import join, dirname, abspath, isdir, isfile
+
+def hot_encoder(data, optional_columns):
+    categorical_cols = []
+    for column in data.columns:
+            if data[column].dtype == object or column in optional_columns:
+                categorical_cols.append(column)
+
+    to_return = pd.get_dummies(data, columns = categorical_cols)
+    return to_return
 
 
-protected_attributes = ['gender']
+if __name__ == "__main__":
+    protected_attributes = ['gender', 'agecat']
+    family = "poisson"
+    # Standard scaling for regression
 
-# Standard scaling for regression
+    dataCar = pd.read_csv("./dataCar_clean.csv")
+    train = dataCar.loc[dataCar['train'] == 1]
+    test = dataCar.loc[dataCar['train'] == 0]
 
-dataCar = pd.read_csv("./dataCar.csv")
-binary_answer = dataCar["clm"].values
-numclaim = dataCar["numclaims"].values
-reg_claim = dataCar["claimcst0"].values
+    protected_values = train[protected_attributes].values
+    train = train.drop(protected_attributes, axis=1)
+    test = test.drop(protected_attributes, axis=1)
 
-dataCar = dataCar.drop(["X_OBSTAT_", "clm", "numclaims", "claimcst0"], axis=1)
+    train_encoded = hot_encoder(train, [])
+    test_encoded = hot_encoder(test, [])
 
-# TODO encoder correctement les différentes valeurs qui ne sont pas des entiers
-dataCar['gender'].replace(to_replace=np.unique(dataCar['gender']), inplace=True, value=range(np.unique(dataCar['gender']).shape[0]))
-dataCar['veh_body'].replace(to_replace=np.unique(dataCar['veh_body']), inplace=True, value=range(np.unique(dataCar['veh_body']).shape[0]))
-dataCar['area'].replace(to_replace=np.unique(dataCar['area']), inplace=True, value=range(np.unique(dataCar['area']).shape[0]))
+    clm_train = train["clm"].values
+    numclaim_train = train["numclaims"].values
+    reg_claim_train = train["claimcst0"].values
 
-protected_values = dataCar[protected_attributes].values
+    clm_test = test["clm"].values
+    numclaim_test = test["numclaims"].values
+    reg_claim_test = test["claimcst0"].values
 
-data = dataCar.drop(protected_attributes,axis=1).values
+    train_encoded = train_encoded.drop(
+        ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "train"], axis=1).values
+    test_encoded = test_encoded.drop(
+        ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "train"], axis=1).values
 
-fam_poisson = FairnessAwareModel(regularization=100, protected_values=protected_values, family="poisson")
-fam_poisson.fit(data, binary_answer)
-# fam_poisson.fit(data, numclaim)
-results = fam_poisson.predict(data)
+    regs = np.logspace(-2, 5, 8)
+    # TODO Si tu change les chiffres dans le logspace, le dernier chiffre va être (top value) - (min value) + 1.
+    #  Par exemple, 5 - (-2) + 1 = 8
+    results = np.zeros((test_encoded.shape[0], regs.shape[0]))
+    index = 0
+    error = []
+    if family == "logistic":
+        for reg in regs:
+            fam_logistic = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial",
+                                              warm_start=True)
+            fam_logistic.fit(train_encoded, clm_train)
+            results[:, index] = fam_logistic.predict(test_encoded)
+            index += 1
+    elif family == "poisson":
+        for reg in regs:
+            fam_poisson = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="poisson")
+            fam_poisson.fit(train_encoded, clm_train)
+            results[:, index] = fam_poisson.predict(test_encoded)
+            index += 1
+    elif family == "gamma":
+        for reg in regs:
+            fam_clm = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial")
+            fam_clm.fit(train_encoded, clm_train)
 
-# fam_gamma = FairnessAwareModel(regularization=100, protected_values=protected_values, family="gamma", alpha=2)
-# fam_gamma.fit(data, reg_claim)
-# fam_gamma.fit(data, reg_claim)
-# # fam.fit(data, reg_claim)
-# results = fam_gamma.predict(data)
+            fam_gamma = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="gamma",
+                                           alpha=(1/0.3429485))
+            fam_gamma.fit(train_encoded, reg_claim_train)
+
+            results[:, index] = fam_gamma.predict(test_encoded) * fam_clm.predict(test_encoded)
+            index += 1
+
+    path = join(dirname(abspath(__file__)), f"results_crossval_{family}.csv")
+    pd.DataFrame(results).to_csv(path, index=False)
+
+
+
+
