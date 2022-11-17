@@ -118,7 +118,7 @@ equal_odds_0_indirect$Metric_plot + ggtitle("Égalité des chances avec la régr
 ### Créer graphiques
 max_ratio = function(fairness_output){
   ratio = fairness_output$Metric[1,1]/fairness_output$Metric[1,2]
-  if(ratio > 1){
+  if(ratio < 1){
     ratio = 1/ratio
   }
   # ratio est entre 0 et 1, ne doit pas être inférieur à 0.8 pour éviter un 
@@ -176,24 +176,28 @@ create_df = function(...){
   return(df)
 }
 
-create_equity_plot = function(dataset, title){
+create_equity_plot = function(dataset, title, position="dodge"){
+  #'@param position (default="dodge"). Valeur de l'argument "position" pour `geom_bar`. En praticulier, "stack" pour stacker les barres ou "dodge" pour les mettre les unes à côté des autres.
   scaleFUN <- function(x) sprintf("%.1f", x) # round y tickslabel to 1 decimal
   
-  ggplot(dataset,
+  p <- ggplot(dataset,
          aes(x = `Modèle`,
              y = `Ratio.max`,
              fill = `Métrique`)) +
     geom_bar(stat = "identity", # y is actual bar height
-             position = position_dodge()) + # unstack bars
+             position = position) + # unstack bars
     labs(y="Ratio maximal", title=TeX(title)) +
     theme_bw() + 
-    geom_hline(yintercept=1.25, col="red") +
     scale_y_continuous(labels=scaleFUN)
-      
+  
+  if (position=="identity"){
+    p = p + geom_hline(yintercept=1.25, col="red")
+  }  
+  return(p)
 }
 
 df = create_df(equal_odds_1_direct, equal_odds_1_indirect, equal_odds_0_direct, equal_odds_0_indirect)
-create_equity_plot(df, "Equalized odds du genre selon le modèle utilisé")
+create_equity_plot(df, "Equalized odds du genre selon le modèle utilisé", position="dodge")
 
 
 
@@ -208,6 +212,11 @@ create_equity_plot(df, "Equalized odds du genre selon le modèle utilisé")
 
 ### TODO : préparer les graphiques pour la loi gamma en python probablement
 
+### TODO : graphique avec seulement la "précision" du modèle, par exemple f-beta ou spécificité (important : minimiser FN)
+
+# mesures de performance du modèle : 
+# TFP, TFN : 
+# TVP, TVN : 
 
 
 
