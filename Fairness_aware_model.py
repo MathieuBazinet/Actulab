@@ -179,7 +179,7 @@ class FairnessAwareModel:
         if self.offset is None:
             self.offset = np.ones(self.X.shape[0])
 
-        res = minimize(self.penalization, self.beta_init, method='BFGS', options={'maxiter': 1000, 'disp': True})
+        res = minimize(self.penalization, self.beta_init, method='BFGS', options={'maxiter': 500, 'disp': True})
         self.beta = res.x
         self.beta_init = self.beta
 
