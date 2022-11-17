@@ -28,7 +28,7 @@ df$train = sample
 # Régression gamma
 ################################################################################
 # juste pour voir le genre de sortie et les paramètres estimés par la fonction
-df_claimsg0 = subset(df, subset=claimcst0>0)
+df_claimsg0 = subset(train, subset=claimcst0>0)
 
 gam = glm(claimcst0 ~ factor(agecat) + gender + area, data=df_claimsg0, family = Gamma(link="log"))
 summary(gam)
