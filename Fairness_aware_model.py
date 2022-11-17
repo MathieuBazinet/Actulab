@@ -3,8 +3,11 @@ from scipy.optimize import minimize
 from scipy.special import factorial
 import pandas as pd
 from sklearn.utils import check_random_state
-import statsmodels.api as sm
-import scipy.special
+try:
+    warm_start_possible = True
+    import statsmodels.api as sm
+except:
+    warm_start_possible = False
 
 
 class FairnessAwareModel:
@@ -171,9 +174,19 @@ class FairnessAwareModel:
 
         if self.beta_init is None:
             ## essai de "warm start"...
-            if warm_start:
-                reference_model = sm.Logit(y_train, X_train).fit()
-                self.beta_init = reference_model.params
+            if warm_start and warm_start_possible:
+                if self.family == "binomial":
+                    reference_model = sm.Logit(y_train, X_train).fit()
+                    self.beta_init = reference_model.params
+                elif self.family == "poisson":
+                    reference_model = sm.GLM(y_train, sm.add_constant(X_train), family=sm.families.Poisson()).fit()
+                    pred = reference_model.predict(sm.add_constant(X_train))
+                    print(pred.min(), pred.max(), pred.mean())
+                    return
+                    self.beta_init = reference_model.params
+                elif self.family == "gamma":
+                    reference_model = sm.GLM(y_train, sm.add_constant(X_train), family=sm.families.Gamma()).fit()
+                    self.beta_init = reference_model.params
             else:
                 self.beta_init = np.ones(self.X.shape[1]) / self.X.shape[1]
         if self.offset is None:
