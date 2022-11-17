@@ -75,11 +75,8 @@ class FairnessAwareModel:
     def log_vraisemblance_binomial(self, X, y):
         # Diapos 35/50 chapitre 2
         lin_predictor = self.beta_dot(X).reshape(-1, 1)
-        pi = 1/(1+np.exp(-lin_predictor))
-        #return np.sum(y.reshape(-1,1) * (np.log(pi) - np.log(1-pi)) + np.log(1-pi) )
-        #return np.sum(y.reshape(-1,1) * lin_predictor - lin_predictor - np.log(1+np.exp(-lin_predictor)))
+        #pi = 1/(1+np.exp(-lin_predictor))
         return np.sum(y.reshape(-1,1) * lin_predictor - np.log(1+np.exp(lin_predictor)))
-        #return np.sum(np.log(y.reshape(-1,1) * pi + (1-y).reshape(-1,1)*(1-pi))) # https://matthew-brett.github.io/cfd2020/more-regression/logistic_convexity.html
 
     def log_vraisemblance_gamma(self, X, y):
         lin_predictor = self.beta_dot(X).reshape(-1, 1)
@@ -154,7 +151,7 @@ class FairnessAwareModel:
                     interval = set(list(np.where(self.y > row_index[i])[0])) & set(list(np.where(self.y < row_index[i+1])[0]))
                     self.subset = np.where(self.protected_values[list(interval), s_index] == v)[0]
                     somme += np.sum(
-                        self.predict(self.X[self.subset, :]) * self.y[self.subset].reshape(-1,1)) / np.sum(self.y[self.subset])
+                        self.predict(self.X[self.subset, :]) * self.y[self.subset].reshape(-1,1)) / np.sum(self.y[self.subset]) # question SOL : pourquoi on ne faitpas juste calculer la moyenne de y? (espérance)
                 predict_list.append(somme)
             for i in range(len(predict_list)):
                 for j in range(i+1, len(predict_list)):
@@ -162,7 +159,7 @@ class FairnessAwareModel:
         self.predict_on_subset = False
         return -log_vraisemblance + loss
 
-    def fit(self, X_train, y_train):
+    def fit(self, X_train, y_train, warm_start=False):
 
         if self.family == "gamma":
             index = np.where(y_train > 0)[0]
@@ -173,13 +170,12 @@ class FairnessAwareModel:
             self.y = y_train
 
         if self.beta_init is None:
-            self.beta_init = np.ones(self.X.shape[1]) / self.X.shape[1]
-            self.beta_init = np.random.rand(X_train.shape[1])
             ## essai de "warm start"...
-            reference_model = sm.Logit(y_train, X_train).fit()
-            self.beta_init = reference_model.params
-            print(self.beta_init)
-
+            if warm_start:
+                reference_model = sm.Logit(y_train, X_train).fit()
+                self.beta_init = reference_model.params
+            else:
+                self.beta_init = np.ones(self.X.shape[1]) / self.X.shape[1]
         if self.offset is None:
             self.offset = np.ones(self.X.shape[0])
 
@@ -215,4 +211,3 @@ class FairnessAwareModel:
 
 if __name__ == "__main__":
     print("hello world")
-    #TODO : comparer l'output de la régression logistique avec un modèle de statsmodel
