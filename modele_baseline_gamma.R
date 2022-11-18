@@ -53,3 +53,9 @@ MASS::gamma.shape(gam) # 0.7632
 (gam$deviance/gam$df.residual)  # 1.569
 #2.Pearson method
 sum(resid(gam,type='pear')^2)/gam$df.residual # estimation used in summary(model)=2.893
+
+
+################################################################################
+# Analyse de la distribution des montants réclamés à l'intérieur des quantiles
+# on ne veut pas avoir slm des hommes dans le 3e-4e quantile, p.ex.
+################################################################################

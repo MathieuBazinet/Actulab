@@ -174,7 +174,7 @@ class FairnessAwareModel:
                     interval = set(list(np.where(self.y > row_index[i])[0])) & set(list(np.where(self.y < row_index[i+1])[0]))
                     self.subset = np.where(self.protected_values[list(interval), s_index] == v)[0]
                     somme += np.sum(
-                        self.predict(self.X[self.subset, :]) * self.y[self.subset].reshape(-1,1)) / np.sum(self.y[self.subset]) # question SOL : pourquoi on ne faitpas juste calculer la moyenne de y? (espérance)
+                        self.predict(self.X[self.subset, :]) * self.y[self.subset].reshape(-1,1)) / np.sum(self.y[self.subset])
                 predict_list.append(somme)
             for i in range(len(predict_list)):
                 for j in range(i+1, len(predict_list)):
