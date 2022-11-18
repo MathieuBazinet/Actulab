@@ -49,7 +49,8 @@ class FairnessAwareModel:
         elif self.family=="binomial":
             link="logit"
             self.log_vraisemblance = self.log_vraisemblance_binomial
-            self.penalization = self.equalized_odds_penalization
+            # self.penalization = self.equalized_odds_penalization
+            self.penalization = self.demographic_parity_penalization
         elif self.family == "gamma":
             self.log_vraisemblance = self.log_vraisemblance_gamma
             link="log"
@@ -105,6 +106,25 @@ class FairnessAwareModel:
         else:
             raise NotImplementedError
 
+    def demographic_parity_penalization(self, beta):
+        self.beta = beta
+        print(self.beta)
+        log_vraisemblance = self.log_vraisemblance(self.X, self.y)
+        loss = 0
+        self.predict_on_subset = True
+        for s_index in range(self.protected_values.shape[1]):
+            values = np.unique(self.protected_values[:, s_index])
+            regularization_parameter = self.regularization[s_index]
+            predict_list = []
+            for v in values:
+                self.subset = np.where(self.protected_values[:, s_index] == v)[0]
+                predict_list.append(np.sum(self.predict(self.X[self.subset, :]))/ self.subset.shape[0])
+            for i in range(len(predict_list)):
+                for j in range(i+1, len(predict_list)):
+                    loss += regularization_parameter * np.abs(predict_list[i] - predict_list[j])
+        self.predict_on_subset = False
+        return -log_vraisemblance + loss
+
 
     def equalized_odds_penalization(self, beta):
         """
@@ -113,7 +133,7 @@ class FairnessAwareModel:
         :return:
         """
         self.beta = beta
-        self.beta = self.beta / np.linalg.norm(self.beta)
+        # self.beta = self.beta / np.linalg.norm(self.beta)
         print(self.beta)
         log_vraisemblance = self.log_vraisemblance(self.X, self.y)
         loss = 0
@@ -180,9 +200,6 @@ class FairnessAwareModel:
                     self.beta_init = reference_model.params
                 elif self.family == "poisson":
                     reference_model = sm.GLM(y_train, sm.add_constant(X_train), family=sm.families.Poisson()).fit()
-                    pred = reference_model.predict(sm.add_constant(X_train))
-                    print(pred.min(), pred.max(), pred.mean())
-                    return
                     self.beta_init = reference_model.params
                 elif self.family == "gamma":
                     reference_model = sm.GLM(y_train, sm.add_constant(X_train), family=sm.families.Gamma()).fit()

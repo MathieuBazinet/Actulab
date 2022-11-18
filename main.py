@@ -15,7 +15,7 @@ def hot_encoder(data, optional_columns):
 
 if __name__ == "__main__":
     protected_attributes = ['gender', 'agecat']
-    family = "poisson"
+    family = "binomial"
     cross_val = False
     # Standard scaling for regression
 
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     results = np.zeros((test_encoded.shape[0], regs.shape[0]))
     index = 0
     error = []
-    if family == "logistic":
+    if family == "binomial":
         for reg in regs:
             fam_logistic = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial")
             fam_logistic.fit(train_encoded, clm_train,warm_start=True)
