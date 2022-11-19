@@ -49,7 +49,7 @@ if __name__ == "__main__":
         ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
 
     #np.logspace(-2, 4, 15)
-    regs = np.logspace(-2, 5, 50) if cross_val else np.array([100])
+    regs = np.logspace(-2, 4, 50) if cross_val else np.array([100])
     # TODO Si tu change les chiffres dans le logspace, le dernier chiffre va être (top value) - (min value) + 1.
     #  Par exemple, 5 - (-2) + 1 = 8
     # C'est pour avoir des multiples de 1, e.g. 1e-2, 1e-1, 1, 10, 100...
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     df_to_return = pd.concat([pd.DataFrame(test["which_set"]).reset_index(drop=True), pd.DataFrame(results).reset_index(drop=True)],axis=1)
     df_to_return.columns = new_colnames
 
-    path = join(dirname(abspath(__file__)), f"results_crossval_{family}_logspace-2_5_50.csv")
+    path = join(dirname(abspath(__file__)), f"results_crossval_{family}_logspace-2_4_50.csv")
     df_to_return.to_csv(path, index=False)
 
 

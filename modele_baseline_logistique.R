@@ -1,4 +1,4 @@
-library(tidyverse);library(MASS);library(caret);library(fairness);library(latex2exp);library(pROC)
+library(tidyverse);library(MASS);library(caret);library(fairness);library(latex2exp);library(pROC);library(scales)
 
 df = read.csv("dataCar.csv")
 df = df %>%
@@ -65,72 +65,15 @@ summary(direct)
 # discrimination indirecte
 indirect = glm(clm~veh_value+veh_body+veh_age+area, family=binomial(link="logit"), data=train)
 
+valid$probs_direct = predict(direct, newdata=valid, type="response")
+valid$probs_indirect = predict(indirect, newdata=valid, type="response")
 test$probs_direct = predict(direct, newdata=test, type="response")
 test$probs_indirect = predict(indirect, newdata=test, type="response")
 cutoff = mean(train$clm)
 
-#### GRAPHIQUES POUR LE SEXE
-
 ################################################################################
-# Égalité des chances
-# P(\hat{Y}=1 | Y=1,A=a) = P(\hat{Y}=1 | Y=1,A=B) pour tout a,b
+# Fonctions utiles
 ################################################################################
-# égalité des chances (equal_odds dans la librairie)
-
-# Y=1
-equal_odds_1_direct = equal_odds(
-  data    = test, 
-  outcome = 'clm',
-  #outcome_base = '0',
-  group   = 'agecat',
-  base    = '1',
-  probs   = 'probs_direct', 
-  cutoff  = cutoff)
-
-equal_odds_1_direct$Metric_plot + ggtitle("Égalité des chances avec la régression logistique")
-
-# Y=1
-equal_odds_1_indirect = equal_odds(
-  data    = test, 
-  outcome = 'clm',
-  outcome_base = '0',
-  group   = 'gender',
-  base    = 'F',
-  probs   = 'probs_indirect',
-  cutoff  = cutoff)
-
-equal_odds_1_indirect$Metric_plot + ggtitle("Égalité des chances avec la régression logistique")
-
-
-# Y=0
-equal_odds_0_direct = fpr_parity(
-  data    = test, 
-  outcome = 'clm',
-  outcome_base = '0',
-  group   = 'gender',
-  base    = 'F',
-  probs   = test$probs_direct, 
-  cutoff  = cutoff)
-
-equal_odds_0_direct$Metric_plot + ggtitle("Égalité des chances avec la régression logistique")
-
-# Y=0
-equal_odds_0_indirect = fpr_parity(
-  data    = test, 
-  outcome = 'clm',
-  outcome_base = '0',
-  group   = 'gender',
-  base    = 'F',
-  probs   = test$probs_indirect,
-  cutoff  = cutoff)
-
-equal_odds_0_indirect$Metric_plot + ggtitle("Égalité des chances avec la régression logistique")
-
-
-
-
-
-
 ### Créer graphiques
 min_ratio = function(fairness_output){
   ratio = fairness_output$Metric[1,1]/fairness_output$Metric[1,2]
@@ -212,6 +155,73 @@ create_equity_plot = function(dataset, title, position="dodge"){
   return(p)
 }
 
+
+#### GRAPHIQUES POUR LE SEXE
+
+################################################################################
+# Égalité des chances
+# P(\hat{Y}=1 | Y=1,A=a) = P(\hat{Y}=1 | Y=1,A=B) pour tout a,b
+################################################################################
+# égalité des chances (equal_odds dans la librairie)
+
+# Y=1
+equal_odds_1_direct = equal_odds(
+  data    = test, 
+  outcome = 'clm',
+  #outcome_base = '0',
+  group   = 'gender',
+  base    = 'F',
+  probs   = 'probs_direct', 
+  cutoff  = cutoff)
+
+equal_odds_1_direct$Metric_plot + ggtitle("Égalité des chances avec la régression logistique")
+
+# Y=1
+equal_odds_1_indirect = equal_odds(
+  data    = test, 
+  outcome = 'clm',
+  outcome_base = '0',
+  group   = 'gender',
+  base    = 'F',
+  probs   = 'probs_indirect',
+  cutoff  = cutoff)
+
+equal_odds_1_indirect$Metric_plot + ggtitle("Égalité des chances avec la régression logistique")
+
+
+# Y=0
+equal_odds_0_direct = fpr_parity(
+  data    = test, 
+  outcome = 'clm',
+  outcome_base = '0',
+  group   = 'gender',
+  base    = 'F',
+  probs   = test$probs_direct, 
+  cutoff  = cutoff)
+
+equal_odds_0_direct$Metric_plot + ggtitle("Égalité des chances avec la régression logistique")
+
+# Y=0
+equal_odds_0_indirect = fpr_parity(
+  data    = test, 
+  outcome = 'clm',
+  outcome_base = '0',
+  group   = 'gender',
+  base    = 'F',
+  probs   = test$probs_indirect,
+  cutoff  = cutoff)
+
+equal_odds_0_indirect$Metric_plot + ggtitle("Égalité des chances avec la régression logistique")
+
+
+
+
+
+
+################################################################################
+# Graphiques
+################################################################################
+
 new_df = create_df(equal_odds_1_direct, equal_odds_1_indirect, equal_odds_0_direct, equal_odds_0_indirect)
 create_equity_plot(new_df, "Equalized odds du genre selon le modèle utilisé", position="dodge")
 
@@ -233,7 +243,7 @@ coords(roc_direct, x=cutoff)
 ################################################################################
 # Rouler le fichier "main.py"
 
-valid_test_probs = read.csv(file="results_crossval_logistic.csv")
+valid_test_probs = read.csv(file="results_crossval_binomial_logspace_-2_4_15.csv") # résultats assez étranges avec results_crossval_binomial_logspace_-2_5_50.csv
 
 valid_probs = subset(valid_test_probs, which_set==1) # validation
 valid_probs$clm = valid$clm
@@ -246,6 +256,7 @@ penalized_models = data.frame()
 
 # calcul ROC/sensibilité/equalized odds pour voir l'effet de l'importance
 # de la discrimination sur les performances
+# DONNÉES DE VALIDATION
 for (i in which(columns_with_probs)){
   roc_i = pROC::roc(response=valid$clm, valid_probs[,i])
   sens_i = coords(roc_i, x=cutoff)$sensitivity
@@ -279,21 +290,62 @@ for (i in which(columns_with_probs)){
   colnames(penalized_models) = c("AUC", "Sensibilité", "Equalized odds, Y=1", "Equalized odds, Y=0", "lambda")
 }
 
-library(scales)
-show_col(hue_pal()(4))
-
 
 # Effet de lambda sur l'équité
+# Y=1
+equal_odds_1_direct_valid = equal_odds(
+  data    = valid, 
+  outcome = 'clm',
+  #outcome_base = '0',
+  group   = 'gender',
+  base    = 'F',
+  probs   = 'probs_direct', 
+  cutoff  = cutoff)
+
+# Y=1
+equal_odds_1_indirect_valid = equal_odds(
+  data    = valid, 
+  outcome = 'clm',
+  outcome_base = '0',
+  group   = 'gender',
+  base    = 'F',
+  probs   = 'probs_indirect',
+  cutoff  = cutoff)
+
+# Y=0
+equal_odds_0_direct_valid = fpr_parity(
+  data    = valid, 
+  outcome = 'clm',
+  outcome_base = '0',
+  group   = 'gender',
+  base    = 'F',
+  probs   = 'probs_direct', 
+  cutoff  = cutoff)
+# Y=0
+equal_odds_0_direct_valid = fpr_parity(
+  data    = valid, 
+  outcome = 'clm',
+  outcome_base = '0',
+  group   = 'gender',
+  base    = 'F',
+  probs   = 'probs_indirect', 
+  cutoff  = cutoff)
+
 colors <- c("Equalized odds, Y=0" = hue_pal()(2)[1], "Equalized odds, Y=1" = hue_pal()(2)[2])
 p1 = ggplot(penalized_models) + 
   geom_line(aes(x=lambda, y=`Equalized odds, Y=0`, color="Equalized odds, Y=0")) + 
+  geom_point(aes(x=lambda, y=`Equalized odds, Y=0`, color="Equalized odds, Y=0")) +
   geom_line(aes(x=lambda, y=`Equalized odds, Y=1`, color="Equalized odds, Y=1")) +
+  geom_point(aes(x=lambda, y=`Equalized odds, Y=1`, color="Equalized odds, Y=1")) +
   scale_color_manual(values = colors) +
   geom_hline(yintercept=0.8, col="red") + 
   geom_hline(yintercept=1.25, col="red") + 
   geom_hline(yintercept=1, col="black", linetype="dashed") +
+  #geom_point(aes(x=0, y=min_ratio(equal_odds_1_direct_valid), col=hue_pal()(2)[1]),show.legend=T) +
   labs(title="Effet de la pénalité sur l'équité", x=TeX("$\\lambda$"), y="Ratio des probabilités hommes/femmes", color="Métrique") +
   theme_bw()
+p1
+# TODO: ajouter modèles de discrimination directe et indirecte
 
 
 # Effet de lambda sur les performances
@@ -312,7 +364,7 @@ p1/p2
 
 # TODO : diagrammes à barre avec le modèle choisi (mettre une ligne vertical pour le modèle choisi sur les time series)
 # TODO : refaire l'analyse avec parité démographique
-
+#TODO : ajouter un point dans le graphique pour la position de chacun des modèles qui discriminent!!! au lieu de diagrammes à bande qui ne servent pas à grand chose...
 
 
 

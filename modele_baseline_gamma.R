@@ -59,3 +59,49 @@ sum(resid(gam,type='pear')^2)/gam$df.residual # estimation used in summary(model
 # Analyse de la distribution des montants réclamés à l'intérieur des quantiles
 # on ne veut pas avoir slm des hommes dans le 3e-4e quantile, p.ex.
 ################################################################################
+
+
+
+
+
+
+################################################################################
+# Fonctions pour les graphiques
+################################################################################
+RMSE = function(true, prediction){
+  sqrt(sum((true-prediction)^2))
+}
+# peut-être utiliser une normalisation pour que ce soit plus interprétable
+
+# les quantiles sont calculées sur les données d'entraînement. En espérant que les données d'entraînement représentent bien les données de validation et de test...
+quantiles_train = quantiles(train$numclaims, probs=)
+WAGF = function(train, valid, predicted_outcome, true_risk, protected_attribute, protected_attribute_base, quantiles=c(0,0.25,0.5,0.75,1)){
+  #' Calculer Weak Actulab Group Fairness définie comme E(M|Q_{\alpha_i} <= R <= Q_{\alpha_{i+1}}, A=a) - E(M|Q_{\alpha_i} <= R <= Q_{\alpha_{i+1}}, A!=a) = \delta. R=true risk=montant réclamé, M=montant réclamé PRÉDIT, A=attribut protégé, e.g. gender.
+  #' On calcule la différence de l'espérance pour tous les quantiles et on retourne la moyenne, le max et la médiane.
+  #' Suppose que l'attribut protégé a deux modalités (homme/femme) pour simplifier
+  
+  quantiles_train = quantile(train[,true_risk], probs=quantiles)
+  
+  df_1 = valid[valid[,protected_attribute]==protected_attribute_base & valid[,predicted_outcome] %in% quantiles_train]
+  df_2 = valid[valid[,protected_attribute]!=protected_attribute_base & valid[,predicted_outcome] %in% quantiles_train]
+  
+  mean(df1[,predicted_outcome]) - mean(df2[,predicted_outcome])
+  
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
