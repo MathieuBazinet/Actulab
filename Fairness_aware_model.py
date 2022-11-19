@@ -12,10 +12,11 @@ except:
 
 class FairnessAwareModel:
 
-    def __init__(self, regularization, protected_values, offset=None, beta_init=None, family="binomial", alpha=None, seed=42):
+    def __init__(self, regularization, protected_values, offset=None, beta_init=None, family="binomial", equity_metric = "EO", alpha=None, seed=42):
         """
         La fonction de lien utilisée est le lien canonique. Pour régression poisson : lien log. Pour régression binomiale : logit.
         family (default="binomial") : "poisson" ou "binomial"
+        equity_metric (default="EO"): EO : equalized odds. DP = demographic parity. Ces deux dernières sont valides pour la régression logistique.
         """
         # On verra si on a besoin de random states mais je les mets là au cas où
 
@@ -49,8 +50,12 @@ class FairnessAwareModel:
         elif self.family=="binomial":
             link="logit"
             self.log_vraisemblance = self.log_vraisemblance_binomial
-            # self.penalization = self.equalized_odds_penalization
-            self.penalization = self.demographic_parity_penalization
+            if equity_metric == "EO":
+                self.penalization = self.equalized_odds_penalization
+            elif equity_metric == "DP":
+                self.penalization = self.demographic_parity_penalization
+            else:
+                raise ValueError("Pénalité non valide pour la régression logistique.")
         elif self.family == "gamma":
             self.log_vraisemblance = self.log_vraisemblance_gamma
             link="log"

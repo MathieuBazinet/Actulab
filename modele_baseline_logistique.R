@@ -1,4 +1,4 @@
-library(tidyverse);library(MASS);library(caret);library(fairness);library(latex2exp);library(pROC);library(scales)
+library(tidyverse);library(MASS);library(caret);library(fairness);library(latex2exp);library(pROC);library(scales);library(patchwork)
 
 df = read.csv("dataCar.csv")
 df = df %>%
@@ -76,7 +76,7 @@ cutoff = mean(train$clm)
 ################################################################################
 ### Créer graphiques
 min_ratio = function(fairness_output){
-  ratio = fairness_output$Metric[1,1]/fairness_output$Metric[1,2]
+  ratio = fairness_output$Metric[1,2]/fairness_output$Metric[1,1] # homme/femme
   #if(ratio > 1){
   #  ratio = 1/ratio
   #}
@@ -215,9 +215,6 @@ equal_odds_0_indirect$Metric_plot + ggtitle("Égalité des chances avec la régr
 
 
 
-
-
-
 ################################################################################
 # Graphiques
 ################################################################################
@@ -228,22 +225,30 @@ create_equity_plot(new_df, "Equalized odds du genre selon le modèle utilisé", 
 
 
 
-# fonction create df avec courbe ROC
-# fonction graphiques avec sensibilité issue de la courbe ROC
-roc_direct = pROC::roc(response=test$clm, test$probs_direct)
-coords(roc_direct, x=cutoff)
 
 
 
-# TODO : rouler le modèle fairness
-# TODO : comment choisir un lambda? Maximiser quelle métrique? ROC/AUC OU sensibilité à un seuil donné
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ################################################################################
 # Analyse des modèles pénalisés
 ################################################################################
 # Rouler le fichier "main.py"
 
-valid_test_probs = read.csv(file="results_crossval_binomial_logspace_-2_4_15.csv") # résultats assez étranges avec results_crossval_binomial_logspace_-2_5_50.csv
+valid_test_probs = read.csv(file="results_crossval_binomial_linspace_-2_4_20_EO.csv") # résultats assez étranges avec results_crossval_binomial_logspace_-2_5_50.csv
 
 valid_probs = subset(valid_test_probs, which_set==1) # validation
 valid_probs$clm = valid$clm
@@ -258,7 +263,7 @@ penalized_models = data.frame()
 # de la discrimination sur les performances
 # DONNÉES DE VALIDATION
 for (i in which(columns_with_probs)){
-  roc_i = pROC::roc(response=valid$clm, valid_probs[,i])
+  roc_i = pROC::roc(response=valid_probs$clm, valid_probs[,i])
   sens_i = coords(roc_i, x=cutoff)$sensitivity
   auc_i = pROC::auc(roc_i) %>% as.numeric()
   
@@ -284,10 +289,10 @@ for (i in which(columns_with_probs)){
     cutoff  = cutoff) %>%
     min_ratio()
   
-  values_i = c(auc_i, sens_i, equal_odds_1_i, equal_odds_0_i, as.numeric(lambdas[i]))
+  values_i = c(auc_i, sens_i, equal_odds_1_i, equal_odds_0_i, as.numeric(lambdas[i]), 1, 5/4, 4/5)
   print(lambdas[i])
   penalized_models = rbind(penalized_models, values_i)
-  colnames(penalized_models) = c("AUC", "Sensibilité", "Equalized odds, Y=1", "Equalized odds, Y=0", "lambda")
+  colnames(penalized_models) = c("AUC", "Sensibilité", "Equalized odds, Y=1", "Equalized odds, Y=0", "lambda", "optimal=1", "Ratio 4/5", "Ratio 5/4")
 }
 
 
@@ -322,7 +327,7 @@ equal_odds_0_direct_valid = fpr_parity(
   probs   = 'probs_direct', 
   cutoff  = cutoff)
 # Y=0
-equal_odds_0_direct_valid = fpr_parity(
+equal_odds_0_indirect_valid = fpr_parity(
   data    = valid, 
   outcome = 'clm',
   outcome_base = '0',
@@ -331,41 +336,55 @@ equal_odds_0_direct_valid = fpr_parity(
   probs   = 'probs_indirect', 
   cutoff  = cutoff)
 
-colors <- c("Equalized odds, Y=0" = hue_pal()(2)[1], "Equalized odds, Y=1" = hue_pal()(2)[2])
+roc_direct_valid = pROC::roc(response=valid_probs$clm, valid$probs_direct)
+sens_direct_valid = coords(roc_direct_valid, x=cutoff)$sensitivity
+auc_direct_valid = pROC::auc(roc_direct_valid) %>% as.numeric()
+roc_indirect_valid = pROC::roc(response=valid_probs$clm, valid$probs_indirect)
+sens_indirect_valid = coords(roc_indirect_valid, x=cutoff)$sensitivity
+auc_indirect_valid = pROC::auc(roc_indirect_valid) %>% as.numeric()
+
+colors <- c("Equalized odds, Y=0" = hue_pal()(2)[1], "Equalized odds, Y=1" = hue_pal()(2)[2], "Ratio optimal" = "black", "Ratio 4/5 ou 5/4"="red")
 p1 = ggplot(penalized_models) + 
   geom_line(aes(x=lambda, y=`Equalized odds, Y=0`, color="Equalized odds, Y=0")) + 
   geom_point(aes(x=lambda, y=`Equalized odds, Y=0`, color="Equalized odds, Y=0")) +
   geom_line(aes(x=lambda, y=`Equalized odds, Y=1`, color="Equalized odds, Y=1")) +
   geom_point(aes(x=lambda, y=`Equalized odds, Y=1`, color="Equalized odds, Y=1")) +
+  geom_line(aes(x=lambda, y=`optimal=1`, color="Ratio optimal")) +
+  geom_line(aes(x=lambda, y=`Ratio 4/5`, color="Ratio 4/5 ou 5/4")) +
+  geom_line(aes(x=lambda, y=`Ratio 5/4`, color="Ratio 4/5 ou 5/4")) +
   scale_color_manual(values = colors) +
-  geom_hline(yintercept=0.8, col="red") + 
-  geom_hline(yintercept=1.25, col="red") + 
-  geom_hline(yintercept=1, col="black", linetype="dashed") +
-  #geom_point(aes(x=0, y=min_ratio(equal_odds_1_direct_valid), col=hue_pal()(2)[1]),show.legend=T) +
+  geom_point(aes(x=0, y=min_ratio(equal_odds_1_direct_valid)), colour=colors[2],shape=3) +
+  geom_point(aes(x=0, y=min_ratio(equal_odds_0_direct_valid)), colour=colors[1], shape=3) +
+  geom_point(aes(x=0, y=min_ratio(equal_odds_1_indirect_valid)), colour=colors[2], shape=4) +
+  geom_point(aes(x=0, y=min_ratio(equal_odds_0_indirect_valid)), colour=colors[1], shape=4) +
   labs(title="Effet de la pénalité sur l'équité", x=TeX("$\\lambda$"), y="Ratio des probabilités hommes/femmes", color="Métrique") +
   theme_bw()
+# "+" = directe, "x" = indirecte. Le mettre en notes de bas de page dans le beamer car je n'ai pas trouvé comment l'ajouter dans le graphique.
 p1
-# TODO: ajouter modèles de discrimination directe et indirecte
 
 
 # Effet de lambda sur les performances
 colors <- c("AUC" = hue_pal()(2)[1], "Sensibilité" = hue_pal()(2)[2])
 p2 = ggplot(penalized_models) + 
   geom_line(aes(x=lambda, y=AUC, color="AUC")) +
+  geom_point(aes(x=lambda, y=AUC, color="AUC")) +
   geom_line(aes(x=lambda, y=Sensibilité, color="Sensibilité")) +
-  labs(title="Effet de la pénalité sur la sensibilité (cutoff=0.068) et l'AUC") +
+  geom_point(aes(x=lambda, y=Sensibilité, color="Sensibilité")) +
   scale_color_manual(values = colors) +
+  geom_point(aes(x=0, y=auc_indirect_valid), colour=colors[2],shape=3) +
+  geom_point(aes(x=0, y=sens_indirect_valid), colour=colors[1],shape=3) +
+  geom_point(aes(x=0, y=auc_direct_valid), colour=colors[2], shape=4) +
+  geom_point(aes(x=0, y=sens_direct_valid), colour=colors[1], shape=4) +
   labs(title="Effet de la pénalité sur la performance", x=TeX("$\\lambda$"), y="Métrique", color="Métrique") +
   theme_bw()
+# "+" = directe, "x" = indirecte. Le mettre en notes de bas de page dans le beamer car je n'ai pas trouvé comment l'ajouter dans le graphique.
+p2
 
-library(patchwork)
-p1/p2
-
+p3 = p1/p2
+ggsave(file="./figures/performance_equite_binomial.pdf", plot=p3, width=10, height=8)
 
 # TODO : diagrammes à barre avec le modèle choisi (mettre une ligne vertical pour le modèle choisi sur les time series)
 # TODO : refaire l'analyse avec parité démographique
-#TODO : ajouter un point dans le graphique pour la position de chacun des modèles qui discriminent!!! au lieu de diagrammes à bande qui ne servent pas à grand chose...
-
 
 
 

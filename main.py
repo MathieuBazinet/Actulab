@@ -49,7 +49,8 @@ if __name__ == "__main__":
         ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
 
     #np.logspace(-2, 4, 15)
-    regs = np.logspace(-2, 4, 50) if cross_val else np.array([100])
+    #regs = np.logspace(-2, 4, 50) if cross_val else np.array([100])
+    regs = np.linspace(0.01, 10000, 20) if cross_val else np.array([100])
     # TODO Si tu change les chiffres dans le logspace, le dernier chiffre va être (top value) - (min value) + 1.
     #  Par exemple, 5 - (-2) + 1 = 8
     # C'est pour avoir des multiples de 1, e.g. 1e-2, 1e-1, 1, 10, 100...
@@ -58,7 +59,7 @@ if __name__ == "__main__":
     error = []
     if family == "binomial":
         for reg in regs:
-            fam_logistic = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial")
+            fam_logistic = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial", equity_metric="DP")
             fam_logistic.fit(train_encoded, clm_train,warm_start=True)
             results[:, index] = fam_logistic.predict(test_encoded).reshape(-1,)
             index += 1
@@ -70,7 +71,7 @@ if __name__ == "__main__":
             index += 1
     elif family == "gamma":
         for reg in regs:
-            fam_clm = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial")
+            fam_clm = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial", equity_metric="EO")
             fam_clm.fit(train_encoded, clm_train, warm_start=True)
 
             probs = fam_clm.predict(test_encoded)
@@ -88,7 +89,7 @@ if __name__ == "__main__":
     df_to_return = pd.concat([pd.DataFrame(test["which_set"]).reset_index(drop=True), pd.DataFrame(results).reset_index(drop=True)],axis=1)
     df_to_return.columns = new_colnames
 
-    path = join(dirname(abspath(__file__)), f"results_crossval_{family}_logspace-2_4_50.csv")
+    path = join(dirname(abspath(__file__)), f"results_crossval_{family}_linspace_-2_4_50_DP.csv")
     df_to_return.to_csv(path, index=False)
 
 
