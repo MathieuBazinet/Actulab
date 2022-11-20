@@ -201,7 +201,7 @@ class FairnessAwareModel:
             ## essai de "warm start"...
             if warm_start and warm_start_possible:
                 if self.family == "binomial":
-                    reference_model = sm.Logit(y_train, X_train).fit()
+                    reference_model = sm.Logit(y_train, X_train).fit() # TODO : j'ai oublié d'ajouter une ordonnée à l'origine pour le modèle binomial, mais pas le temps de changer les résultats.
                     self.beta_init = reference_model.params
                 elif self.family == "poisson":
                     reference_model = sm.GLM(y_train, sm.add_constant(X_train), family=sm.families.Poisson()).fit()
