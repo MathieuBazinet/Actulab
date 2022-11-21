@@ -2,7 +2,11 @@ import numpy as np
 import pandas as pd
 from Fairness_aware_model import FairnessAwareModel
 from os.path import join, dirname, abspath, isdir, isfile
-import statsmodels.api as sm
+try:
+    sm_api_possible = True
+    import statsmodels.api as sm
+except:
+    sm_api_possible = False
 
 def hot_encoder(data, optional_columns):
     categorical_cols = []
@@ -15,15 +19,9 @@ def hot_encoder(data, optional_columns):
 
 
 if __name__ == "__main__":
-<<<<<<< HEAD
-    protected_attributes = ['gender', 'agecat']
-    family = "gamma"
-    cross_val = False
-=======
     family = "gamma"
     protected_attributes = ['gender'] 
     cross_val = True
->>>>>>> 9ddab94cf82b985850bf847c9e72cdbd7207af86
     # Standard scaling for regression
 
     dataCar = pd.read_csv("./dataCar_clean.csv")
@@ -57,8 +55,9 @@ if __name__ == "__main__":
 
     # ajout de l'ordonnée à l'origine 
     # REMARQUE : cette ligne de code n'était pas écrite pour nos résultats avec la régression logistique (pas le modèle de fréquence/sévérité, mais seulement logistique)
-    train_encoded = sm.add_constant(train_encoded)
-    test_encoded = sm.add_constant(test_encoded)
+    if sm_api_possible:
+        train_encoded = sm.add_constant(train_encoded)
+        test_encoded = sm.add_constant(test_encoded)
 
     #np.logspace(-2, 4, 15)
     #regs = np.logspace(-2, 4, 50) if cross_val else np.array([100])
@@ -84,13 +83,8 @@ if __name__ == "__main__":
             index += 1
     elif family == "gamma":
         for reg in regs:
-<<<<<<< HEAD
-            # fam_clm = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial")
-            # fam_clm.fit(train_encoded, clm_train, warm_start=True)
-=======
             fam_clm = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial", equity_metric="EO")
             fam_clm.fit(train_encoded, clm_train, warm_start=True)
->>>>>>> 9ddab94cf82b985850bf847c9e72cdbd7207af86
 
             fam_gamma = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="gamma",
                                            alpha=(0.3429485))

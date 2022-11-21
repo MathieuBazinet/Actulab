@@ -178,13 +178,8 @@ class FairnessAwareModel:
                 for i in range(len(row_index)-1):
                     interval = set(list(np.where(self.y > row_index[i])[0])) & set(list(np.where(self.y < row_index[i+1])[0]))
                     self.subset = np.where(self.protected_values[list(interval), s_index] == v)[0]
-<<<<<<< HEAD
                     predict_sum = np.sum(self.predict(self.X[self.subset, :]) * self.y[self.subset].reshape(-1,1))
                     somme += predict_sum / (np.sum(self.y[self.subset]) * (row_index[i+1]-row_index[i]))
-=======
-                    somme += np.sum(
-                        self.predict(self.X[self.subset, :]) * self.y[self.subset].reshape(-1,1)) / np.sum(self.y[self.subset])
->>>>>>> 9ddab94cf82b985850bf847c9e72cdbd7207af86
                 predict_list.append(somme)
             for i in range(len(predict_list)):
                 for j in range(i+1, len(predict_list)):
