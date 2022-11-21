@@ -12,10 +12,11 @@ except:
 
 class FairnessAwareModel:
 
-    def __init__(self, regularization, protected_values, offset=None, beta_init=None, family="binomial", alpha=None, seed=42):
+    def __init__(self, regularization, protected_values, offset=None, beta_init=None, family="binomial", equity_metric = "EO", alpha=None, seed=42):
         """
         La fonction de lien utilisée est le lien canonique. Pour régression poisson : lien log. Pour régression binomiale : logit.
         family (default="binomial") : "poisson" ou "binomial"
+        equity_metric (default="EO"): EO : equalized odds. DP = demographic parity. Ces deux dernières sont valides pour la régression logistique.
         """
         # On verra si on a besoin de random states mais je les mets là au cas où
 
@@ -49,8 +50,12 @@ class FairnessAwareModel:
         elif self.family=="binomial":
             link="logit"
             self.log_vraisemblance = self.log_vraisemblance_binomial
-            # self.penalization = self.equalized_odds_penalization
-            self.penalization = self.demographic_parity_penalization
+            if equity_metric == "EO":
+                self.penalization = self.equalized_odds_penalization
+            elif equity_metric == "DP":
+                self.penalization = self.demographic_parity_penalization
+            else:
+                raise ValueError("Pénalité non valide pour la régression logistique.")
         elif self.family == "gamma":
             self.log_vraisemblance = self.log_vraisemblance_gamma
             link="log"
@@ -173,8 +178,13 @@ class FairnessAwareModel:
                 for i in range(len(row_index)-1):
                     interval = set(list(np.where(self.y > row_index[i])[0])) & set(list(np.where(self.y < row_index[i+1])[0]))
                     self.subset = np.where(self.protected_values[list(interval), s_index] == v)[0]
+<<<<<<< HEAD
                     predict_sum = np.sum(self.predict(self.X[self.subset, :]) * self.y[self.subset].reshape(-1,1))
                     somme += predict_sum / (np.sum(self.y[self.subset]) * (row_index[i+1]-row_index[i]))
+=======
+                    somme += np.sum(
+                        self.predict(self.X[self.subset, :]) * self.y[self.subset].reshape(-1,1)) / np.sum(self.y[self.subset])
+>>>>>>> 9ddab94cf82b985850bf847c9e72cdbd7207af86
                 predict_list.append(somme)
             for i in range(len(predict_list)):
                 for j in range(i+1, len(predict_list)):
@@ -196,7 +206,7 @@ class FairnessAwareModel:
             ## essai de "warm start"...
             if warm_start and warm_start_possible:
                 if self.family == "binomial":
-                    reference_model = sm.Logit(y_train, X_train).fit()
+                    reference_model = sm.Logit(y_train, X_train).fit() # TODO : j'ai oublié d'ajouter une ordonnée à l'origine pour le modèle binomial, mais pas le temps de changer les résultats.
                     self.beta_init = reference_model.params
                 elif self.family == "poisson":
                     reference_model = sm.GLM(y_train, sm.add_constant(X_train), family=sm.families.Poisson()).fit()
