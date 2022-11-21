@@ -15,7 +15,7 @@ def hot_encoder(data, optional_columns):
 
 if __name__ == "__main__":
     protected_attributes = ['gender', 'agecat']
-    family = "binomial"
+    family = "gamma"
     cross_val = False
     # Standard scaling for regression
 
@@ -66,8 +66,8 @@ if __name__ == "__main__":
             index += 1
     elif family == "gamma":
         for reg in regs:
-            fam_clm = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial")
-            fam_clm.fit(train_encoded, clm_train, warm_start=True)
+            # fam_clm = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial")
+            # fam_clm.fit(train_encoded, clm_train, warm_start=True)
 
             fam_gamma = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="gamma",
                                            alpha=(1/0.3429485))
