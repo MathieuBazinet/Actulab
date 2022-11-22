@@ -87,7 +87,7 @@ if __name__ == "__main__":
             fam_clm.fit(train_encoded, clm_train, warm_start=True)
 
             fam_gamma = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="gamma",
-                                           alpha=(0.3429485))
+                                           alpha=(1/2.92382)) # alpha=phi^(-1) estimé en R avec summary(modele_gamma_discrimination)$disp = phi
             fam_gamma.fit(train_encoded, reg_claim_train, warm_start=True)
             
             # TODO : retourner le montant de gamma et la prob de logistic dans 2 colonnes ou changer fam_clm_predict(type="response")

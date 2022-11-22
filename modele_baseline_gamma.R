@@ -1,4 +1,4 @@
-library(tidyverse);library(MASS);library(fairness);library(ggplot2)
+library(tidyverse);library(MASS);library(fairness);library(ggplot2);library(patchwork);library(latex2exp);library(scales)
 
 df = read.csv("dataCar.csv")
 df = df %>%
@@ -27,69 +27,66 @@ df = df %>%
 
 df_claimsg0 <- subset(df, subset=claimcst0>0) # df sans les motants nuls 
 
+
 ids_split <- splitTools::partition(
     y = df_claimsg0[, "clm"]
     ,p = c(train = 0.7, valid = 0.15, test = 0.15)
     ,type = "stratified" # stratified is the default
     ,seed = 42
 )
-train <- df_claimsg0[ids_split$train, ]
-valid <- df_claimsg0[ids_split$valid, ]
-test <- df_claimsg0[ids_split$test, ]
+train_g0 <- df_claimsg0[ids_split$train, ]
+valid_g0 <- df_claimsg0[ids_split$valid, ]
+test_g0 <- df_claimsg0[ids_split$test, ]
 
-train$which_set = 0
-valid$which_set = 1
-test$which_set = 2
+train_g0$which_set = 0
+valid_g0$which_set = 1
+test_g0$which_set = 2
+
+# tronquer les montants trop élevés... va diminuer le biais pour tout le monde avec des petites valeurs de montant réclamé mais l'augmenter pour les montants réclamés élevés.
+# je vais le changer seulement en train
+max= quantile(train_g0$claimcst0, 0.9) # 18045.16$
+train_g0 = train_g0 %>% 
+  mutate(
+    claimcst0_trunc = if_else(claimcst0>max, max, claimcst0)
+  )
 
 
 ################################################################################
-# Régression gamma
+# Régression gamma directe et indirecte 
 ################################################################################
-# juste pour voir le genre de sortie et les paramètres estimés par la fonction
-# df_claimsg0 = subset(train, subset=claimcst0>0)
+# Direct 
+direct = glm(claimcst0 ~ veh_value+veh_body+veh_age+gender+area, data=train_g0, family = Gamma(link="log"))
+summary(direct)
 
-gam = glm(claimcst0 ~ gender + area, data=train, family = Gamma(link="log"))
-summary(gam)
+# Indirect
 
-gam$coefficients
-gam$effects
-gam$method
+indirect = glm(claimcst0 ~ veh_value+veh_body+veh_age  + area, data=train_g0, family = Gamma(link="log"))
+summary(indirect)
 
 ### Estimation du paramètre de dispersion (shape, alpha=nu)
 ### remarque : dispersion = phi = nu^-1
 # https://stats.stackexchange.com/questions/367560/how-to-choose-shape-parameter-for-gamma-distribution-when-using-generalized-line
 # https://courses.ms.ut.ee/MTMS.01.011/2019_spring/uploads/Main/GLM_slides_5_continuous_response_print.pdf
 
-summary(gam)$disp # estimation de alpha=nu=2.893
-MASS::gamma.shape(gam) # 0.7632
+summary(indirect)$disp # estimation de alpha=nu=2.92382
+MASS::gamma.shape(indirect) # 0.7632
 # pas du tout la même chose...
 
 ?MASS:::gamma.shape.glm
 
 #Dispersion parameter estimation
 #1.Deviance method
-(gam$deviance/gam$df.residual)  # 1.569
+(indirect$deviance/indirect$df.residual)  # 1.575598
 #2.Pearson method
-sum(resid(gam,type='pear')^2)/gam$df.residual # estimation used in summary(model)=2.893
-
-################################################################################
-# Régression gamma directe et indirecte 
-################################################################################
-# Direct 
-direct = glm(claimcst0 ~ veh_value+veh_body+veh_age+gender+area, data=train, family = Gamma(link="log"))
-summary(direct)
-
-# Indirect
-
-indirect = glm(claimcst0 ~ veh_value+veh_body+veh_age  + area, data=train, family = Gamma(link="log"))
-summary(indirect)
+sum(resid(indirect,type='pear')^2)/indirect$df.residual # estimation used in summary(model)=2.92382
 
 
-valid$pred_direct <- predict( direct, newdata = valid, type = "response")
-valid$pred_indirect <- predict( indirect, newdata = valid, type = "response")
 
-test$pred_direct <-  predict( direct, newdata = test, type = "response")
-test$pred_indirect <-predict( indirect, newdata = test, type = "response")
+valid_g0$pred_direct <- predict( direct, newdata = valid_g0, type = "response")
+valid_g0$pred_indirect <- predict( indirect, newdata = valid_g0, type = "response")
+
+test_g0$pred_direct <-  predict( direct, newdata = test_g0, type = "response")
+test_g0$pred_indirect <-predict( indirect, newdata = test_g0, type = "response")
 
 
 ################################################################################
@@ -97,21 +94,50 @@ test$pred_indirect <-predict( indirect, newdata = test, type = "response")
 # on ne veut pas avoir slm des hommes dans le 3e-4e quantile, p.ex.
 ################################################################################
 
+# Excluant les 0, histogramme des montants réclamés
+ggplot(train_g0, aes(x = claimcst0)) + 
+  geom_histogram(colour = 1, fill = "white", bins=100) +
+  #geom_density(col="red") + 
+  labs(x="Montant réclamé", y="Densité", title="Montants réclamés (entraînement), excluant 0", fill="Genre") +
+  theme_bw()
+#ggsave()
+
+# excluant les 0, histogramme des montants réclamés par sexe
+g1 = ggplot(train_g0, aes(x=claimcst0, fill=gender)) + 
+  geom_histogram(aes(y = ..density..),
+                 colour = 1, bins=100, alpha=0.4) +
+  #geom_density() + 
+  labs(x="Montant réclamé", y="densité", fill="Genre") +
+  theme_bw()
+
+
+g2 = ggplot(train_g0, aes(x=claimcst0, fill=gender)) + 
+  geom_density(aes(y = ..density..),
+                 colour = 1, bins=100, alpha=0.4) +
+  #geom_density() + 
+  labs(x="Montant réclamé", y="densité", fill="Genre") +
+  theme_bw()
+
+g3 = ggpubr::ggarrange(g1, g2, ncol=2, nrow=1, common.legend = TRUE, legend="bottom") # les hommes ont des montants réclamés un peu plus élevés en pratique, queue un peu plus lourde...
+# c'est vrai en entraînement mais pour toutes les données aussi
+ggsave("./figures/repartition_montant_reclamation_hf_train.pdf", plot=g3, width=10, height=6)
+
+
 ## pas très élaboré comme code mais ça fait la job 
 ## ech d'entrainement 
-quantile_train <- quantile(train$claimcst0)
-train_q1 <- subset(train, subset = (train$claimcst0 < quantile_train[[2]]) ) 
+quantile_train_g0 <- quantile(train_g0$claimcst0)
+train_q1 <- subset(train_g0, subset = (train_g0$claimcst0 < quantile_train_g0[[2]]) ) 
 summary(train_q1)
 
-train_q2 <- subset(train, subset = ((train$claimcst0 >= quantile_train[[2]]) &
-                                        (train$claimcst0 < quantile_train[[3]]))) 
+train_q2 <- subset(train_g0, subset = ((train_g0$claimcst0 >= quantile_train_g0[[2]]) &
+                                        (train_g0$claimcst0 < quantile_train_g0[[3]]))) 
 summary(train_q2)
 
-train_q3 <- subset(train, subset = ((train$claimcst0 >= quantile_train[[3]]) &
-                                        (train$claimcst0 < quantile_train[[4]]))) 
+train_q3 <- subset(train_g0, subset = ((train_g0$claimcst0 >= quantile_train_g0[[3]]) &
+                                        (train_g0$claimcst0 < quantile_train_g0[[4]]))) 
 summary(train_q3)
 
-train_q4 <- subset(train, subset = ((train$claimcst0 >= quantile_train[[4]]))) 
+train_q4 <- subset(train_g0, subset = ((train_g0$claimcst0 >= quantile_train_g0[[4]]))) 
 summary(train_q4)
 
 par(mfrow=c(2,2))
@@ -119,23 +145,23 @@ boxplot_q1 <-boxplot(train_q1$claimcst0~train_q1$gender, col=c("#009999", "#0000
 boxplot_q2 <-boxplot(train_q2$claimcst0~train_q2$gender, col=c("#009999", "#0000FF"), xlab = "Genre", ylab = "Montant réclamé", main="[Q1,Q2]")
 boxplot_q3 <-boxplot(train_q3$claimcst0~train_q3$gender, col=c("#009999", "#0000FF"), xlab = "Genre", ylab = "Montant réclamé", main="[Q3,Q4]")
 boxplot_q4 <-boxplot(train_q4$claimcst0~train_q4$gender, col=c("#009999", "#0000FF"), xlab = "Genre", ylab = "Montant réclamé", main="[Q4,max]")
-mtext("Distribution du montant réclamé dans les différents quantiles selon le genre", side = 3, line = - 1,font=2, outer = TRUE)
+#mtext("Distribution du montant réclamé (excluant 0) dans les différents quantiles selon le genre", side = 3, line = - 1,font=2, outer = TRUE)
 par(mfrow=c(1,1))
 
 ## ech de validation 
-quantile_valid <- quantile(valid$claimcst0)
-valid_q1 <- subset(valid, subset = (valid$claimcst0 < quantile_valid[[2]]) ) 
+quantile_valid_g0 <- quantile(valid_g0$claimcst0)
+valid_q1 <- subset(valid_g0, subset = (valid_g0$claimcst0 < quantile_valid_g0[[2]]) ) 
 summary(valid_q1)
 
-valid_q2 <- subset(valid, subset = ((valid$claimcst0 >= quantile_valid[[2]]) &
-                                        (valid$claimcst0 < quantile_valid[[3]]))) 
+valid_q2 <- subset(valid_g0, subset = ((valid_g0$claimcst0 >= quantile_valid_g0[[2]]) &
+                                        (valid_g0$claimcst0 < quantile_valid_g0[[3]]))) 
 summary(valid_q2)
 
-valid_q3 <- subset(valid, subset = ((valid$claimcst0 >= quantile_valid[[3]]) &
-                                        (valid$claimcst0 < quantile_valid[[4]]))) 
+valid_q3 <- subset(valid_g0, subset = ((valid_g0$claimcst0 >= quantile_valid_g0[[3]]) &
+                                        (valid_g0$claimcst0 < quantile_valid_g0[[4]]))) 
 summary(valid_q3)
 
-valid_q4 <- subset(valid, subset = ((valid$claimcst0 >= quantile_valid[[4]]))) 
+valid_q4 <- subset(valid_g0, subset = ((valid_g0$claimcst0 >= quantile_valid_g0[[4]]))) 
 summary(valid_q4)
 
 par(mfrow=c(2,2))
@@ -143,8 +169,10 @@ boxplot_q1 <-boxplot(valid_q1$claimcst0~valid_q1$gender, col=c("#009999", "#0000
 boxplot_q2 <-boxplot(valid_q2$claimcst0~valid_q2$gender, col=c("#009999", "#0000FF"), xlab = "Genre", ylab = "Montant réclamé", main="[Q1,Q2]")
 boxplot_q3 <-boxplot(valid_q3$claimcst0~valid_q3$gender, col=c("#009999", "#0000FF"), xlab = "Genre", ylab = "Montant réclamé", main="[Q3,Q4]")
 boxplot_q4 <-boxplot(valid_q4$claimcst0~valid_q4$gender, col=c("#009999", "#0000FF"), xlab = "Genre", ylab = "Montant réclamé", main="[Q4,max]")
-mtext("Distribution du montant réclamé dans les différents quantiles selon le genre", side = 3, line = - 1,font=2, outer = TRUE)
+mtext("Distribution du montant réclamé (validation) dans les différents quantiles selon le genre", side = 3, line = - 1,font=2, outer = TRUE)
 par(mfrow=c(1,1))
+
+
 
 
 
@@ -155,95 +183,127 @@ par(mfrow=c(1,1))
 
 
 #Modèle direct
-dat1 <- data.frame(dens = c(valid$claimcst0, valid$pred_direct)
-                   , lines = rep(c("Montant reclamé", "Montant prédit"), each = nrow(valid)))
+dat1 <- data.frame(dens = c(valid_g0$claimcst0, valid_g0$pred_direct)
+                   , lines = rep(c("Montant reclamé", "Montant prédit"), each = nrow(valid_g0)))
 #Plot.
 ggplot(dat1, aes(x = dens, fill = lines)) + 
     geom_density(alpha = 0.5) +
-    labs(y="Densité",x="Montant", title="Distribution des prédictions : Modèle direct")
+    labs(y="Densité",x="Montant") +
+  theme_bw()
+ggsave("./figures/distribution_clmcst0_direct_excluant0.png", width=8, height=6)
 
 #Modèle indirect
-dat2 <- data.frame(dens = c(valid$claimcst0, valid$pred_indirect)
-                   , lines = rep(c("Montant reclamé", "Montant prédit"), each = nrow(valid)))
+dat2 <- data.frame(dens = c(valid_g0$claimcst0, valid_g0$pred_indirect)
+                   , lines = rep(c("Montant reclamé", "Montant prédit"), each = nrow(valid_g0)))
 #Plot.
 ggplot(dat2, aes(x = dens, fill = lines)) + 
     geom_density(alpha = 0.5) +
-    labs(y="Densité",x="Montant", title="Distribution des prédictions : Modèle indirect")
+    labs(y="Densité",x="Montant", title="Distribution des prédictions : Modèle indirect (excluant 0)")
+
+### Séparer par sexe
+direct_sexe <- data.frame(dens = c(valid_g0$pred_direct)
+                   , lines = rep(c("Montant prédit"), each = nrow(valid_g0)))
+direct_sexe$gender = c(valid_g0$gender)
+
+#Plot.
+colnames(valid_g0)
+g1 = ggplot(valid_g0) + 
+  geom_density(aes(x = pred_direct, fill=gender), alpha = 0.5) +
+  labs(y="Densité",x="Montant", fill="Genre") + 
+  geom_vline(xintercept=quantile_train_g0[1], linetype="dashed") + 
+  geom_vline(xintercept=quantile_train_g0[2], linetype="dashed") + 
+  geom_vline(xintercept=quantile_train_g0[3], linetype="dashed") + 
+  geom_vline(xintercept=quantile_train_g0[4], linetype="dashed") +
+  theme_bw()
+
+g2 = ggplot(valid_g0) + 
+  geom_density(aes(x = pred_indirect, fill=gender), alpha = 0.5) +
+  labs(y="Densité",x="Montant", fill="Genre") +
+  geom_vline(xintercept=quantile_train_g0[1], linetype="dashed") + 
+  geom_vline(xintercept=quantile_train_g0[2], linetype="dashed") + 
+  geom_vline(xintercept=quantile_train_g0[3], linetype="dashed") + 
+  geom_vline(xintercept=quantile_train_g0[4], linetype="dashed") +
+  theme_bw()
+g2
+g3 = ggpubr::ggarrange(g1, g2, ncol=2, nrow=1, common.legend = TRUE, legend="bottom")
+#ggsave("./figures/distribution_predictions_quantiles_direct_indirect.pdf",plot=g3, width=10, height=6)
 
 
 ################################################################################
 # Fonctions pour les graphiques
 ################################################################################
-RMSE = function(true, prediction){
-    sqrt(sum((true-prediction)^2))
+NRMSE = function(true, prediction, normalize=TRUE, normalization_method="quantile"){
+  #' @param normalization_method (default=quantile). Quantile ou max_min. 
+  
+  RMSE = sqrt(sum((true-prediction)^2))
+ 
+  if (normalization_method=="quantile"){
+    normalization_factor = 1/(quantile(true, 0.75) - quantile(true, 0.25))
+  } else if(normalization_method=="max_min")
+    normalization_factor = 1/(max(true) - min(true))
+  
+  if (normalize){
+    RMSE = RMSE * normalization_factor
+  }
+  return(RMSE)
 }
 # peut-être utiliser une normalisation pour que ce soit plus interprétable
 
 # les quantiles sont calculées sur les données d'entraînement. En espérant que les données d'entraînement représentent bien les données de validation et de test...
-quantiles_train = quantile(train$numclaims, probs=)
 
-WAGF = function(train, valid, predicted_outcome, true_risk, protected_attribute, protected_attribute_base, quantiles=c(0,0.25,0.5,0.75,1)){
+quantiles_train_claimcst0 = quantile(train_g0[,"claimcst0"], probs=c(0, 0.25, 0.5, 0.75, 1))
+
+WAGF2 = function(valid, predicted_outcome, true_risk, protected_attribute, protected_attribute_base, ponderation=TRUE, quantiles_train=quantiles_train_claimcst0){
     #' Calculer Weak Actulab Group Fairness définie comme E(M|Q_{\alpha_i} <= R <= Q_{\alpha_{i+1}}, A=a) - E(M|Q_{\alpha_i} <= R <= Q_{\alpha_{i+1}}, A!=a) = \delta. R=true risk=montant réclamé, M=montant réclamé PRÉDIT, A=attribut protégé, e.g. gender.
     #' On calcule la différence de l'espérance pour tous les quantiles et on retourne la moyenne, le max et la médiane.
     #' Suppose que l'attribut protégé a deux modalités (homme/femme) pour simplifier
-    
-    quantiles_train = quantile(train[,true_risk], probs=quantiles)
-    
-    df_1 = valid[valid[,protected_attribute]==protected_attribute_base & valid[,predicted_outcome] %in% quantiles_train]
-    df_2 = valid[valid[,protected_attribute]!=protected_attribute_base & valid[,predicted_outcome] %in% quantiles_train]
-    
-    mean(df1[,predicted_outcome]) - mean(df2[,predicted_outcome])
-    
-}
 
-
-## je ne veux pas modifier ton code alors je fais une nouvelle fonction WAGF2
-## quantile de numclaim ou claimst0 ??
-
-WAGF2 = function(train, valid, predicted_outcome, true_risk, protected_attribute, protected_attribute_base, quantiles=c(0,0.25,0.5,0.75,1)){
-    #' Calculer Weak Actulab Group Fairness définie comme E(M|Q_{\alpha_i} <= R <= Q_{\alpha_{i+1}}, A=a) - E(M|Q_{\alpha_i} <= R <= Q_{\alpha_{i+1}}, A!=a) = \delta. R=true risk=montant réclamé, M=montant réclamé PRÉDIT, A=attribut protégé, e.g. gender.
-    #' On calcule la différence de l'espérance pour tous les quantiles et on retourne la moyenne, le max et la médiane.
-    #' Suppose que l'attribut protégé a deux modalités (homme/femme) pour simplifier
-    
-    quantiles_train = quantile(train[,true_risk], probs=quantiles)
     x1<-vector(length = (length(quantiles_train)-1))
-    
     for (i in 1:(length(quantiles_train)-1)){
-        
-        dat = subset(valid, subset = (valid$claimcst0 >= quantiles_train[[i]]) &
-                           (valid$claimcst0 < quantiles_train[[(i+1)]]))
-        
+      #TODO
+      # en procédant ainsi, les observations qui ont une valeur réelle < le quantile en train ne sont pas considérées dans la métrique. On pourrait choisir de les inclure en conditionnant avec seulement valid$claimcst0 < quantiles_train[[(i+1)]]) lorsque i=1 et seulement valid$claimcst0 >= quantiles_train[[i]] lorsque i=3 (dernier quantile -1)
+      dat = subset(valid, subset = (valid[, true_risk] >= quantiles_train[[i]]) &
+                       (valid[, true_risk] < quantiles_train[[(i+1)]]))
+
+        print(paste0("Number of rows in subset ", i, ": ", nrow(dat),"/", nrow(valid)))
         df_1 = subset(dat, subset =dat[,protected_attribute]==protected_attribute_base)
         df_2 = subset(dat, subset =! (dat[,protected_attribute]==protected_attribute_base))
         
-        x1[i] <- abs(mean(df_1[,predicted_outcome]) - mean(df_2[,predicted_outcome]))
-        
-        
-    }
-    
-    delta<-list(maximum=max(x1),mediane=median(x1),moyenne=mean(x1), all_deltas = x1)
-    
+        absolute_diff = abs(mean(df_1[,predicted_outcome]) - mean(df_2[,predicted_outcome]))
+        if (ponderation){
+          x1[i] <- absolute_diff * 1/(quantiles_train[[(i+1)]] - quantiles_train[[i]])
+        } else{
+          x1[i] <- absolute_diff 
+        }
+     }
+    print(x1)
+    delta<-list(maximum=max(x1),mediane=median(x1),moyenne=mean(x1), somme=sum(x1), all_deltas = x1)
 }
 
+################################################################################
+# Score des modèles direct et indirect, excluant 0
+################################################################################
 
-WAGF_direct <- WAGF2(train,valid,"pred_direct","claimcst0","gender","F",quantiles=c(0,0.25,0.5,0.75,1))
-WAGF_indirect <- WAGF2(train,valid,"pred_indirect","claimcst0","gender","F",quantiles=c(0,0.25,0.5,0.75,1))
-RMSE_direct <- RMSE(valid$claimcst0,valid$pred_direct)
-RMSE_indirect <- RMSE(valid$claimcst0,valid$pred_indirect)
+WAGF_direct <- WAGF2(valid_g0,"pred_direct","claimcst0","gender","F",ponderation=T, quantiles_train=quantiles_train_claimcst0)
+WAGF_indirect <- WAGF2(valid_g0,"pred_indirect","claimcst0","gender","F",ponderation=T, quantiles_train=quantiles_train_claimcst0)
+NRMSE_direct <- NRMSE(valid_g0$claimcst0,valid_g0$pred_direct, normalize=T, normalization_method="max_min")
+NRMSE_indirect <- NRMSE(valid_g0$claimcst0,valid_g0$pred_indirect, normalize=T, normalization_method="max_min")
 
 Model <-c("Direct","Indirect","Direct","Indirect")
-Value <- c( WAGF_direct$maximum, WAGF_indirect$maximum, RMSE_direct, RMSE_indirect)
-Metric <-c("delta","delta","RMSE","RMSE")
-new_df = data.frame(Model, Value,Metric)
+Value <- c(WAGF_direct$somme, WAGF_indirect$somme, NRMSE_direct, NRMSE_indirect)
+#Value <- c( max(WAGF_direct$all_deltas), max(WAGF_indirect$maximum), RMSE_direct, RMSE_indirect)
+Metric <- c("somme(PAQ)","somme(PAQ)", "NRMSE","NRMSE")
+Metric <- factor(Metric, levels = rev(levels(as.factor(Metric)))) # somme(PAQ) en 1er, NRMSE en 2e, pour le graphique
+new_df = data.frame(Model, Value, Metric)
+
 
 
 ggplot(new_df, aes(x=Model, y=Value, fill=Metric)) +
     geom_bar(stat = "identity") +
-    coord_cartesian(ylim=c(90000,94000), expand = F)
-
-
-
-
+    #coord_cartesian(ylim=c(90000,95000), expand = T) + 
+  labs(x="Modèle", y="Valeur", fill="Métrique") + 
+  theme_bw()
+#ggsave("./figures/NRMSE_sumPAQ_direct_indirect.png", width=8, height=6)
 
 
 
@@ -259,81 +319,76 @@ ggplot(new_df, aes(x=Model, y=Value, fill=Metric)) +
 ################################################################################
 # Analyse des modèles pénalisés
 ################################################################################
-
-
-### retour au jeu de donnée avec 0
-ids_split0 <- splitTools::partition(
-    y = df[, "clm"]
-    ,p = c(train0 = 0.7, valid0 = 0.15, test0 = 0.15)
-    ,type = "stratified" # stratified is the default
-    ,seed = 42
+# finalement, on analyse seulement le modèle gamma
+# CRÉATION DES DONNÉES INCLUANT LES 0
+ids_split <- splitTools::partition(
+  y = df[, "clm"]
+  ,p = c(train = 0.7, valid = 0.15, test = 0.15)
+  ,type = "stratified" # stratified is the default
+  ,seed = 42
 )
-train0 <- df[ids_split0$train0, ]
-valid0 <- df[ids_split0$valid0, ]
-test0 <- df[ids_split0$test0, ]
+train <- df[ids_split$train, ]
+valid <- df[ids_split$valid, ]
+test <- df[ids_split$test, ]
 
-train0$which_set = 0
-valid0$which_set = 1
-test0$which_set = 2
-
-## importer prob logistique 
-valid_test_probs = read.csv(file="results_crossval_gamma_linspace_-2_4_20_binomial_EO.csv") 
-
-valid_probs = subset(valid_test_probs, which_set==1) # validation
-valid_probs$clm = valid0$clm
-valid_probs$gender = valid0$gender
-
-columns_with_probs = colnames(valid_probs) %>% str_detect("^X")
-lambdas = colnames(valid_probs) %>% str_extract("\\d+.\\d+")
-
-cutoff = mean(train0$clm)
+train$which_set = 0
+valid$which_set = 1
+test$which_set = 2
 
 ## importer pred gamma 
-valid_test_gamma = read.csv(file="results_crossval_gamma_linspace_-2_4_20_gamma_WAGF.csv") 
+valid_test_gamma = read.csv(file="resultats/results_crossval_gamma_linspace_-2_4_20_gamma_WAGF.csv") 
+# REMARQUE : On va évaluer les modèles seulement sur les observations t.q. claimcst0 > 0, ce qui suppose que le modèle qui identifie s'il y a une réclamation ou non est parfait... Ceci cause un certain biais dans les analyses, mais c'est pour simplifier.
 
-valid_predclaim = subset(valid_test_gamma, which_set==1) # validation
-valid_predclaim$claimcst0 = valid0$claimcst0
-valid_predclaim$gender = valid0$gender
+#TODO : regarder il y a cb dobservations
+
+valid_test_gamma$claimcst0 = rbind(valid,test)$claimcst0
+valid_test_gamma$gender = rbind(valid,test)$gender
+
+valid_gamma = subset(valid_test_gamma, subset=(which_set==1)) # validation
+test_gamma = subset(valid_test_gamma, subset=(which_set==2))
+
+valid_gamma_g0 = subset(valid_test_gamma, subset=(which_set==1 & claimcst0>0)) # validation
+test_gamma_g0 = subset(valid_test_gamma, subset=(which_set==2 & claimcst0>0))
+
+# on va combiner test et valid, sinon il n'y aura pas beaucoup d'observations...
+valid_test_gamma_g0 = rbind(valid_gamma_g0, test_gamma_g0)
 
 
-columns_with_pred = colnames(valid_predclaim) %>% str_detect("^X")
-lambdas = colnames(valid_predclaim) %>% str_extract("\\d+.\\d+")
+columns_with_pred = colnames(valid_test_gamma_g0) %>% str_detect("^X")
+lambdas = colnames(valid_test_gamma_g0) %>% str_extract("\\d+.\\d+")
 
 # calcul RMSE/equalized odds pour voir l'effet de l'importance
 # de la discrimination sur les performances
-# DONNÉES DE VALIDATION
-
+# DONNÉES DE VALIDATION ET DE TEST CAR SINON JE TROUVE QU'IL N'Y A PAS ASSEZ DE DONNÉES
 penalized_models = data.frame()
+#train_g0 <-subset(train,subset = (train$claimcst0>0))
 
+for (i in which(columns_with_pred)){
 
-for (i in which(columns_with_probs)){
-    pred_clm_i = ifelse(valid_probs[,i]>cutoff,1,0)
-    pred_claimcst0_i = valid_predclaim[,i]
-    pred_logXgam_i = pred_clm_i*pred_claimcst0_i
+    valid_predclaim_i = valid_test_gamma_g0[,i]
     
-    rmse_i = RMSE(valid_predclaim$claimcst0,pred_logXgam_i)
-    
-    data<-subset(train0,subset = (train0$claimcst0>0))  ### retirer 0 pour quantiles ?
-    
-    WAGF_i = WAGF2(data,valid_predclaim,i ,"claimcst0","gender","F",quantiles=c(0,0.25,0.5,0.75,1))
-    
-    values_i = c(rmse_i, WAGF_i$maximum,as.numeric(lambdas[i]))
+    rmse_i = NRMSE(valid_test_gamma_g0$claimcst0, valid_predclaim_i, normalize = TRUE, normalization_method = "max_min")
+
+    WAGF_i = WAGF2(valid_test_gamma_g0, colnames(valid_test_gamma_g0)[i], "claimcst0", "gender","F", quantiles_train=quantiles_train_claimcst0, ponderation=TRUE)
+
+    values_i = c(rmse_i, WAGF_i$somme, as.numeric(lambdas[i]))
     print(lambdas[i])
     penalized_models = rbind(penalized_models, values_i)
     colnames(penalized_models) = c("RMSE", "WAGF", "lambda")
-    
 }
 
-
+penalized_models = penalized_models %>%
+  subset(WAGF < 10)
+  
 colors <- c("RMSE" = hue_pal()(2)[1], "WAGF" = hue_pal()(2)[2])
 p1 = ggplot(penalized_models) + 
-    geom_line(aes(x=lambda, y=RMSE, color="RMSE")) + 
-    geom_point(aes(x=lambda, y=RMSE, color="RMSE")) +
+    geom_line(aes(x=lambda, y=RMSE, color="NRMSE")) + 
+    geom_point(aes(x=lambda, y=RMSE, color="NRMSE")) +
     geom_line(aes(x=lambda, y=WAGF, color="WAGF")) +
     geom_point(aes(x=lambda, y=WAGF, color="WAGF")) +
     scale_color_manual(values = colors) +
 
-    scale_y_continuous("RMSE", sec.axis = sec_axis(~ . /10000, name="WAGF"))+
+    scale_y_continuous("RMSE", sec.axis = sec_axis(~ . /1000, name="WAGF"))+
 
     labs(title="Effet de la pénalité sur l'équité et la performance", x=TeX("$\\lambda$"), color="Métrique") +
     theme_bw()
@@ -342,7 +397,7 @@ p1
 
 
 ### TODO visualisation
-
+quantiles_train = quantile(train_g0[,"claimcst0"], probs=c(0,0.25,0.5,0.75,1))
 
 
 
