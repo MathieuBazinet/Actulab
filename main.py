@@ -29,8 +29,9 @@ if __name__ == "__main__":
     test = dataCar.loc[dataCar['which_set'] != 0] # Ceci est les données de validation ET de test
 
     protected_values = train[protected_attributes].values
-    train = train.drop(protected_attributes, axis=1)
-    test = test.drop(protected_attributes, axis=1)
+    #TODO : je vais essayer sans droper l'attribut protégé, donc en faisant de la discrimination directe, et voir si on peut améliorer ca
+    #train = train.drop(protected_attributes, axis=1)
+    #test = test.drop(protected_attributes, axis=1)
     train = train.drop("agecat", axis=1)# retirer agecat du dataset au début pour voir ce qui se passe avec gender "indépendamment" de la pénalisation sur agecat
     test = test.drop("agecat", axis=1)
 
@@ -48,10 +49,15 @@ if __name__ == "__main__":
     borne_clm = np.mean(clm_train)
     born_numclaim = np.mean(numclaim_train)
 
+    # train_encoded = train_encoded.drop(
+    #     ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
+    # test_encoded = test_encoded.drop(
+    #     ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
     train_encoded = train_encoded.drop(
-        ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
+        ["clm", "numclaims", "claimcst0", "veh_body_BUS", "gender_M", "area_A", "exposure", "which_set"], axis=1).values
     test_encoded = test_encoded.drop(
-        ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
+        ["clm", "numclaims", "claimcst0", "veh_body_BUS", "gender_M", "area_A", "exposure", "which_set"], axis=1).values
+    #TODO : train_encoded contient gender_M, donc on va faire de la discrimination directe, voir si notre pénalisation améliore les résultats
 
     # ajout de l'ordonnée à l'origine 
     # REMARQUE : cette ligne de code n'était pas écrite pour nos résultats avec la régression logistique (pas le modèle de fréquence/sévérité, mais seulement logistique)
@@ -113,7 +119,7 @@ if __name__ == "__main__":
         df_gam = pd.concat([pd.DataFrame(test["which_set"]).reset_index(drop=True), pd.DataFrame(results_gamma).reset_index(drop=True)],axis=1)
         df_gam.columns = new_colnames
 
-        path_bin = join(dirname(abspath(__file__)), f"resultats/results_crossval_{family}_linspace_-2_4_20_binomial_EO.csv")
-        path_gam = join(dirname(abspath(__file__)), f"resultats/results_crossval_{family}_linspace_-2_4_20_gamma_WAGF.csv")
+        path_bin = join(dirname(abspath(__file__)), f"resultats/results_crossval_{family}_linspace_-2_4_20_binomial_EO_new_directe.csv")
+        path_gam = join(dirname(abspath(__file__)), f"resultats/results_crossval_{family}_linspace_-2_4_20_gamma_WAGF_new_directe.csv")
         df_bin.to_csv(path_bin, index=False)
         df_gam.to_csv(path_gam, index=False)

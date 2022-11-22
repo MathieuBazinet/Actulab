@@ -86,7 +86,7 @@ min_ratio = function(fairness_output){
   return(ratio)
 }
 
-min_ratio(equal_odds_0_direct)
+#min_ratio(equal_odds_0_direct)
 
 object_name_as_str = function(objet){
     deparse(substitute(objet))
@@ -248,7 +248,7 @@ create_equity_plot(new_df, "Equalized odds du genre selon le modèle utilisé", 
 ################################################################################
 # Rouler le fichier "main.py"
 
-valid_test_probs = read.csv(file="results_crossval_binomial_linspace_-2_4_20_EO.csv") # résultats assez étranges avec results_crossval_binomial_logspace_-2_5_50.csv
+valid_test_probs = read.csv(file="./resultats/results_crossval_binomial_linspace_-2_4_20_EO.csv") # résultats assez étranges avec results_crossval_binomial_logspace_-2_5_50.csv
 
 valid_probs = subset(valid_test_probs, which_set==1) # validation
 valid_probs$clm = valid$clm
@@ -353,10 +353,10 @@ p1 = ggplot(penalized_models) +
   geom_line(aes(x=lambda, y=`Ratio 4/5`, color="Ratio 4/5 ou 5/4")) +
   geom_line(aes(x=lambda, y=`Ratio 5/4`, color="Ratio 4/5 ou 5/4")) +
   scale_color_manual(values = colors) +
-  geom_point(aes(x=0, y=min_ratio(equal_odds_1_direct_valid)), colour=colors[2],shape=3) +
-  geom_point(aes(x=0, y=min_ratio(equal_odds_0_direct_valid)), colour=colors[1], shape=3) +
-  geom_point(aes(x=0, y=min_ratio(equal_odds_1_indirect_valid)), colour=colors[2], shape=4) +
-  geom_point(aes(x=0, y=min_ratio(equal_odds_0_indirect_valid)), colour=colors[1], shape=4) +
+  geom_point(aes(x=0, y=min_ratio(equal_odds_1_direct_valid)), colour=colors[2],shape=3, size=3) +
+  geom_point(aes(x=0, y=min_ratio(equal_odds_0_direct_valid)), colour=colors[1], shape=3, size=3) +
+  geom_point(aes(x=0, y=min_ratio(equal_odds_1_indirect_valid)), colour=colors[2], shape=4, size=3) +
+  geom_point(aes(x=0, y=min_ratio(equal_odds_0_indirect_valid)), colour=colors[1], shape=4, size=3) +
   labs(title="Effet de la pénalité sur l'équité", x=TeX("$\\lambda$"), y="Ratio des probabilités hommes/femmes", color="Métrique") +
   theme_bw()
 # "+" = directe, "x" = indirecte. Le mettre en notes de bas de page dans le beamer car je n'ai pas trouvé comment l'ajouter dans le graphique.
@@ -371,17 +371,17 @@ p2 = ggplot(penalized_models) +
   geom_line(aes(x=lambda, y=Sensibilité, color="Sensibilité")) +
   geom_point(aes(x=lambda, y=Sensibilité, color="Sensibilité")) +
   scale_color_manual(values = colors) +
-  geom_point(aes(x=0, y=auc_indirect_valid), colour=colors[2],shape=3) +
-  geom_point(aes(x=0, y=sens_indirect_valid), colour=colors[1],shape=3) +
-  geom_point(aes(x=0, y=auc_direct_valid), colour=colors[2], shape=4) +
-  geom_point(aes(x=0, y=sens_direct_valid), colour=colors[1], shape=4) +
+  geom_point(aes(x=0, y=auc_direct_valid), colour=colors[1],shape=3, size=3) +
+  geom_point(aes(x=0, y=sens_direct_valid), colour=colors[2],shape=3, size=3) +
+  geom_point(aes(x=0, y=auc_indirect_valid), colour=colors[1], shape=4, size=3) +
+  geom_point(aes(x=0, y=sens_indirect_valid), colour=colors[2], shape=4, size=3) +
   labs(title="Effet de la pénalité sur la performance", x=TeX("$\\lambda$"), y="Métrique", color="Métrique") +
   theme_bw()
 # "+" = directe, "x" = indirecte. Le mettre en notes de bas de page dans le beamer car je n'ai pas trouvé comment l'ajouter dans le graphique.
 p2
 
 p3 = p1/p2
-ggsave(file="./figures/performance_equite_binomial.pdf", plot=p3, width=10, height=8)
+#ggsave(file="./figures/performance_equite_binomial.pdf", plot=p3, width=10, height=8)
 
 # TODO : diagrammes à barre avec le modèle choisi (mettre une ligne vertical pour le modèle choisi sur les time series)
 # TODO : refaire l'analyse avec parité démographique
