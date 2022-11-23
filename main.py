@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from Fairness_aware_model import FairnessAwareModel
-from os.path import join, dirname, abspath, isdir, isfile
+from os.path import join, dirname, abspath
 try:
     sm_api_possible = True
     import statsmodels.api as sm
@@ -9,6 +9,12 @@ except:
     sm_api_possible = False
 
 def hot_encoder(data, optional_columns):
+    """
+    Fonction permettant d'encoder sous forme one-hot la base de données
+    :param data: La base de données a encoder
+    :param optional_columns: Des colonnes d'attributs protégés qui doivent obligatoirement être encodées.
+    :return: La base de donnée encodée
+    """
     categorical_cols = []
     for column in data.columns:
             if data[column].dtype == object or column in optional_columns:
@@ -19,11 +25,15 @@ def hot_encoder(data, optional_columns):
 
 
 if __name__ == "__main__":
+    # Pour l'instant, vous pouvez choisir entre une "poisson", une "binomial" et une "gamma"
     family = "gamma"
-    protected_attributes = ['gender'] 
-    cross_val = True
-    # Standard scaling for regression
+    # Il serait par exemple possible d'utiliser aussi 'age_cat'
+    protected_attributes = ['gender']
 
+    # Lorsque cross_val est True, on entraîne sur multiples valeurs de lambda. Sinon, on utilise lambda=100
+    cross_val = True
+
+    # On fait le traitement nécessaire au fichier pour qu'il soit utilisé.
     dataCar = pd.read_csv("./dataCar_clean.csv")
     train = dataCar.loc[dataCar['which_set'] == 0]
     test = dataCar.loc[dataCar['which_set'] != 0] # Ceci est les données de validation ET de test
@@ -31,7 +41,10 @@ if __name__ == "__main__":
     protected_values = train[protected_attributes].values
     train = train.drop(protected_attributes, axis=1)
     test = test.drop(protected_attributes, axis=1)
-    train = train.drop("agecat", axis=1)# retirer agecat du dataset au début pour voir ce qui se passe avec gender "indépendamment" de la pénalisation sur agecat
+
+    # retirer agecat du dataset au début pour voir ce qui se passe
+    # avec gender "indépendamment" de la pénalisation sur agecat
+    train = train.drop("agecat", axis=1)
     test = test.drop("agecat", axis=1)
 
     train_encoded = hot_encoder(train, [])
@@ -54,24 +67,23 @@ if __name__ == "__main__":
         ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
 
     # ajout de l'ordonnée à l'origine 
-    # REMARQUE : cette ligne de code n'était pas écrite pour nos résultats avec la régression logistique (pas le modèle de fréquence/sévérité, mais seulement logistique)
+    # REMARQUE : L'ajout d'une constante n'était pas utilisée pour la régression logistique dans nos résultats
     if sm_api_possible:
         train_encoded = sm.add_constant(train_encoded)
         test_encoded = sm.add_constant(test_encoded)
 
-    #np.logspace(-2, 4, 15)
     #regs = np.logspace(-2, 4, 50) if cross_val else np.array([100])
     regs = np.linspace(0.01, 10000, 20) if cross_val else np.array([100]) # pour logistique
-    # TODO Si tu change les chiffres dans le logspace, le dernier chiffre va être (top value) - (min value) + 1.
-    #  Par exemple, 5 - (-2) + 1 = 8
-    # C'est pour avoir des multiples de 1, e.g. 1e-2, 1e-1, 1, 10, 100...
+
+    # Fichiers de résultats de tests
     results = np.zeros((test_encoded.shape[0], regs.shape[0]))
     results_gamma = np.zeros((test_encoded.shape[0], regs.shape[0]))
     index = 0
     error = []
     if family == "binomial":
         for reg in regs:
-            fam_logistic = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial", equity_metric="DP")
+            fam_logistic = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial",
+                                              equity_metric="DP")
             fam_logistic.fit(train_encoded, clm_train,warm_start=True)
             results[:, index] = fam_logistic.predict(test_encoded).reshape(-1,)
             index += 1
@@ -83,14 +95,14 @@ if __name__ == "__main__":
             index += 1
     elif family == "gamma":
         for reg in regs:
-            fam_clm = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial", equity_metric="EO")
+            fam_clm = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial",
+                                         equity_metric="EO")
             fam_clm.fit(train_encoded, clm_train, warm_start=True)
 
+            # alpha=phi^(-1) estimé en R avec summary(modele_gamma_discrimination)$disp = phi
             fam_gamma = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="gamma",
-                                           alpha=(1/2.92382)) # alpha=phi^(-1) estimé en R avec summary(modele_gamma_discrimination)$disp = phi
+                                           alpha=(1/2.92382))
             fam_gamma.fit(train_encoded, reg_claim_train, warm_start=True)
-            
-            # TODO : retourner le montant de gamma et la prob de logistic dans 2 colonnes ou changer fam_clm_predict(type="response")
 
             results[:, index] = (fam_clm.predict(test_encoded)).reshape(-1,)
             results_gamma[:, index] = (fam_gamma.predict(test_encoded)).reshape(-1,)
@@ -99,6 +111,7 @@ if __name__ == "__main__":
     new_colnames = regs.tolist()
     new_colnames.insert(0, "which_set")
 
+    # Sauvegarder les données dans des fichiers csv
     if family!="gamma":
         df_to_return = pd.concat([pd.DataFrame(test["which_set"]).reset_index(drop=True), pd.DataFrame(results).reset_index(drop=True)],axis=1)
         df_to_return.columns = new_colnames
