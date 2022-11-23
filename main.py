@@ -39,8 +39,10 @@ if __name__ == "__main__":
     test = dataCar.loc[dataCar['which_set'] != 0] # Ceci est les données de validation ET de test
 
     protected_values = train[protected_attributes].values
-    train = train.drop(protected_attributes, axis=1)
-    test = test.drop(protected_attributes, axis=1)
+    # on enlève les données protégées sauf dans le cas de la régression gamma:
+    if family != "gamma":
+        train = train.drop(protected_attributes, axis=1)
+        test = test.drop(protected_attributes, axis=1)
 
     # retirer agecat du dataset au début pour voir ce qui se passe
     # avec gender "indépendamment" de la pénalisation sur agecat
@@ -61,15 +63,19 @@ if __name__ == "__main__":
     borne_clm = np.mean(clm_train)
     born_numclaim = np.mean(numclaim_train)
 
-    # train_encoded = train_encoded.drop(
-    #     ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
-    # test_encoded = test_encoded.drop(
-    #     ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
-    train_encoded = train_encoded.drop(
-        ["clm", "numclaims", "claimcst0", "veh_body_BUS", "gender_M", "area_A", "exposure", "which_set"], axis=1).values
-    test_encoded = test_encoded.drop(
-        ["clm", "numclaims", "claimcst0", "veh_body_BUS", "gender_M", "area_A", "exposure", "which_set"], axis=1).values
-    #TODO : train_encoded contient gender_M, donc on va faire de la discrimination directe, voir si notre pénalisation améliore les résultats
+    if family == "gamma":
+        train_encoded = train_encoded.drop(
+            ["clm", "numclaims", "claimcst0", "veh_body_BUS", "gender_M", "area_A", "exposure", "which_set"],
+            axis=1).values
+        test_encoded = test_encoded.drop(
+            ["clm", "numclaims", "claimcst0", "veh_body_BUS", "gender_M", "area_A", "exposure", "which_set"],
+            axis=1).values
+    else:
+        train_encoded = train_encoded.drop(
+            ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
+        test_encoded = test_encoded.drop(
+            ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
+
 
     # ajout de l'ordonnée à l'origine 
     # REMARQUE : L'ajout d'une constante n'était pas utilisée pour la régression logistique dans nos résultats
