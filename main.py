@@ -61,10 +61,15 @@ if __name__ == "__main__":
     borne_clm = np.mean(clm_train)
     born_numclaim = np.mean(numclaim_train)
 
+    # train_encoded = train_encoded.drop(
+    #     ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
+    # test_encoded = test_encoded.drop(
+    #     ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
     train_encoded = train_encoded.drop(
-        ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
+        ["clm", "numclaims", "claimcst0", "veh_body_BUS", "gender_M", "area_A", "exposure", "which_set"], axis=1).values
     test_encoded = test_encoded.drop(
-        ["clm", "numclaims", "claimcst0", "veh_body_BUS", "area_A", "exposure", "which_set"], axis=1).values
+        ["clm", "numclaims", "claimcst0", "veh_body_BUS", "gender_M", "area_A", "exposure", "which_set"], axis=1).values
+    #TODO : train_encoded contient gender_M, donc on va faire de la discrimination directe, voir si notre pénalisation améliore les résultats
 
     # ajout de l'ordonnée à l'origine 
     # REMARQUE : L'ajout d'une constante n'était pas utilisée pour la régression logistique dans nos résultats
@@ -126,7 +131,7 @@ if __name__ == "__main__":
         df_gam = pd.concat([pd.DataFrame(test["which_set"]).reset_index(drop=True), pd.DataFrame(results_gamma).reset_index(drop=True)],axis=1)
         df_gam.columns = new_colnames
 
-        path_bin = join(dirname(abspath(__file__)), f"resultats/results_crossval_{family}_linspace_-2_4_20_binomial_EO.csv")
-        path_gam = join(dirname(abspath(__file__)), f"resultats/results_crossval_{family}_linspace_-2_4_20_gamma_WAGF.csv")
+        path_bin = join(dirname(abspath(__file__)), f"resultats/results_crossval_{family}_linspace_-2_4_20_binomial_EO_new_directe.csv")
+        path_gam = join(dirname(abspath(__file__)), f"resultats/results_crossval_{family}_linspace_-2_4_20_gamma_WAGF_new_directe.csv")
         df_bin.to_csv(path_bin, index=False)
         df_gam.to_csv(path_gam, index=False)
