@@ -193,9 +193,9 @@ dat1 <- data.frame(dens = c(valid_g0$claimcst0, valid_g0$pred_direct)
 #Plot.
 ggplot(dat1, aes(x = dens, fill = lines)) + 
     geom_density(alpha = 0.5) +
-    labs(y="Densité",x="Montant", fill="") +
+    labs(y="Densité",x="Montant") +
   theme_bw()
-#ggsave("./figures/distribution_clmcst0_direct_excluant0.png", width=10, height=6)
+#ggsave("./figures/distribution_clmcst0_direct_excluant0.png", width=8, height=6)
 
 #Modèle indirect
 dat2 <- data.frame(dens = c(valid_g0$claimcst0, valid_g0$pred_indirect)
@@ -220,9 +220,6 @@ g1 = ggplot(valid_g0) +
   geom_vline(xintercept=quantile_train_g0[3], linetype="dashed") + 
   geom_vline(xintercept=quantile_train_g0[4], linetype="dashed") +
   theme_bw()
-#ggsave("./figures/distribution_predictions_quantiles_direct.pdf",plot=g1, width=10, height=6)
-
-
 
 g2 = ggplot(valid_g0) + 
   geom_density(aes(x = pred_indirect, fill=gender), alpha = 0.5) +
@@ -268,7 +265,8 @@ WAGF2 = function(valid, predicted_outcome, true_risk, protected_attribute, prote
 
     x1<-vector(length = (length(quantiles_train)-1))
     for (i in 1:(length(quantiles_train)-1)){
-
+      #TODO
+      # en procédant ainsi, les observations qui ont une valeur réelle < le quantile en train ne sont pas considérées dans la métrique. On pourrait choisir de les inclure en conditionnant avec seulement valid$claimcst0 < quantiles_train[[(i+1)]]) lorsque i=1 et seulement valid$claimcst0 >= quantiles_train[[i]] lorsque i=3 (dernier quantile -1)
       if(i==1){
         dat = subset(valid, subset = (valid[, true_risk] < quantiles_train[[(i+1)]]))
       } else if (i==length(quantiles_train)-1){
@@ -281,8 +279,7 @@ WAGF2 = function(valid, predicted_outcome, true_risk, protected_attribute, prote
       print(paste0("Number of rows in subset ", i, ": ", nrow(dat),"/", nrow(valid)))
       df_1 = subset(dat, subset = dat[,protected_attribute]==protected_attribute_base)
       df_2 = subset(dat, subset = !(dat[,protected_attribute]==protected_attribute_base))
-      
-      # calcul de PAQ sur le quantile
+        
       absolute_diff = abs(mean(df_1[,predicted_outcome]) - mean(df_2[,predicted_outcome]))
       if (ponderation){
         x1[i] <- absolute_diff * 1/(quantiles_train[[(i+1)]] - quantiles_train[[i]])
@@ -321,6 +318,15 @@ ggplot(new_df, aes(x=Model, y=Value, fill=Metric)) +
 
 
 
+
+
+
+
+
+
+
+
+
 ################################################################################
 # Analyse des modèles pénalisés
 ################################################################################
@@ -342,7 +348,6 @@ test$which_set = 2
 
 ## importer pred gamma 
 valid_test_gamma = read.csv(file="./resultats/results_crossval_gamma_linspace_-2_4_20_gamma_WAGF_new_directe.csv") 
-#valid_test_gamma = read.csv(file="./resultats/results_crossval_gamma_linspace_-2_20000_75_gamma_WAGF_new_directe.csv") 
 # REMARQUE : On va évaluer les modèles seulement sur les observations t.q. claimcst0 > 0, ce qui suppose que le modèle qui identifie s'il y a une réclamation ou non est parfait... Ceci cause un certain biais dans les analyses, mais c'est pour simplifier.
 
 valid_test_gamma$claimcst0 = rbind(valid,test)$claimcst0
@@ -413,7 +418,7 @@ WAGF_indirect <- WAGF2(valid_g0,"pred_indirect","claimcst0","gender","F",pondera
 NRMSE_direct <- NRMSE(valid_g0$claimcst0,valid_g0$pred_direct, normalize=T, normalization_method="max_min")
 NRMSE_indirect <- NRMSE(valid_g0$claimcst0,valid_g0$pred_indirect, normalize=T, normalization_method="max_min")
 
-colors <- c("NRMSE" = hue_pal()(2)[2], "somme(PAQ)" = hue_pal()(2)[1])
+colors <- c("NRMSE" = hue_pal()(2)[1], "somme(PAQ)" = hue_pal()(2)[2])
 p1 = ggplot(penalized_models) + 
     geom_line(aes(x=lambda, y=NRMSE, color="NRMSE")) + 
     geom_point(aes(x=lambda, y=NRMSE, color="NRMSE")) +
@@ -428,7 +433,6 @@ p1 = ggplot(penalized_models) +
     geom_vline(xintercept=penalized_models$lambda[10], linetype="dashed", color="black") +
     labs(title="Effet de la pénalité sur l'équité et la performance (validation)", x=TeX("$\\lambda$"), y="Métrique", color="Métrique") +
     theme_bw()
-p1
 # "+" = directe, "x" = indirecte. Le mettre en notes de bas de page dans le beamer car je n'ai pas trouvé comment l'ajouter dans le graphique.
 #ggsave("./figures/performance_equite_gamma.pdf", plot=p1, width=10,height=6)
 
@@ -452,10 +456,8 @@ NRMSE_penalized <- NRMSE(test_g0$claimcst0,test_g0$pred_penalized, normalize=T, 
 
 
 
-Model <-c("Direct","Penalisé", "Indirect", "Direct", "Penalisé", "Indirect")
-Model <- as.factor(Model) %>% fct_relevel("Direct","Penalisé", "Indirect")
-
-Value <- c(WAGF_direct$somme, WAGF_penalized$somme, WAGF_indirect$somme, NRMSE_direct, NRMSE_penalized, NRMSE_indirect)
+Model <-c("Direct","Indirect", "Penalisé", "Direct","Indirect", "Penalisé")
+Value <- c(WAGF_direct$somme, WAGF_indirect$somme, WAGF_penalized$somme, NRMSE_direct, NRMSE_indirect, NRMSE_penalized)
 #Value <- c( max(WAGF_direct$all_deltas), max(WAGF_indirect$maximum), RMSE_direct, RMSE_indirect)
 Metric <- c("somme(PAQ)","somme(PAQ)","somme(PAQ)", "NRMSE","NRMSE","NRMSE")
 Metric <- factor(Metric, levels = rev(levels(as.factor(Metric)))) # somme(PAQ) en 1er, NRMSE en 2e, pour le graphique
@@ -468,7 +470,7 @@ ggplot(new_df, aes(x=Model, y=Value, fill=Metric)) +
   #coord_cartesian(ylim=c(90000,95000), expand = T) + 
   labs(x="Modèle", y="Valeur", fill="Métrique") + 
   theme_bw()
-#ggsave("./figures/NRMSE_sumPAQ_direct_indirect_penalized_test.png", plot=last_plot(), width=8, height=6)
+#ggsave("./figures/NRMSE_sumPAQ_direct_indirect_test.png", plot=last_plot(), width=8, height=6)
 
 
 # finalement, distribution des prédictions à travers les quantiles
@@ -499,6 +501,6 @@ g3 = ggplot(test_g0) +
   geom_vline(xintercept=quantile_train_g0[4], linetype="dashed") +
   theme_bw()
 
-g4 = ggpubr::ggarrange(g1, g3, g2, ncol=3, nrow=1, common.legend = TRUE, legend="bottom")
+g4 = ggpubr::ggarrange(g1, g2, g3, ncol=3, nrow=1, common.legend = TRUE, legend="bottom")
 #ggsave("./figures/distribution_predictions_quantiles_direct_indirect_penalized_test.pdf",plot=g4, width=14, height=6)
 

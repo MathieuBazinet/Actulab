@@ -43,7 +43,7 @@ test$which_set = 2
 # Statistiques descriptives
 ################################################################################
 
-round(df$numclaims %>% table() %>% prop.table()*100,3) %>% cumsum()
+round(df$numclaims %>% table() %>% prop.table()*100,2) %>% cumsum()
 # 99.58% des données ont 0 ou 1 réclamation. Dans ce contexte, il est approprié
 # d'utiliser une variable binaire, c'est-à-dire considérer s'il y a au moins une
 # réclamation dans l'année. Le GLM sera donc une régression logistique.
@@ -342,7 +342,6 @@ auc_direct_valid = pROC::auc(roc_direct_valid) %>% as.numeric()
 roc_indirect_valid = pROC::roc(response=valid_probs$clm, valid$probs_indirect)
 sens_indirect_valid = coords(roc_indirect_valid, x=cutoff)$sensitivity
 auc_indirect_valid = pROC::auc(roc_indirect_valid) %>% as.numeric()
-lambdas = penalized_models$lambda
 
 colors <- c("Equalized odds, Y=0" = hue_pal()(2)[1], "Equalized odds, Y=1" = hue_pal()(2)[2], "Ratio optimal" = "black", "Ratio 4/5 ou 5/4"="red")
 p1 = ggplot(penalized_models) + 
@@ -358,7 +357,6 @@ p1 = ggplot(penalized_models) +
   geom_point(aes(x=0, y=min_ratio(equal_odds_0_direct_valid)), colour=colors[1], shape=3, size=3) +
   geom_point(aes(x=0, y=min_ratio(equal_odds_1_indirect_valid)), colour=colors[2], shape=4, size=3) +
   geom_point(aes(x=0, y=min_ratio(equal_odds_0_indirect_valid)), colour=colors[1], shape=4, size=3) +
-  geom_vline(xintercept=lambdas[14], linetype="dashed") +
   labs(title="Effet de la pénalité sur l'équité", x=TeX("$\\lambda$"), y="Ratio des probabilités hommes/femmes", color="Métrique") +
   theme_bw()
 # "+" = directe, "x" = indirecte. Le mettre en notes de bas de page dans le beamer car je n'ai pas trouvé comment l'ajouter dans le graphique.
@@ -377,7 +375,6 @@ p2 = ggplot(penalized_models) +
   geom_point(aes(x=0, y=sens_direct_valid), colour=colors[2],shape=3, size=3) +
   geom_point(aes(x=0, y=auc_indirect_valid), colour=colors[1], shape=4, size=3) +
   geom_point(aes(x=0, y=sens_indirect_valid), colour=colors[2], shape=4, size=3) +
-  geom_vline(xintercept=lambdas[14], linetype="dashed") +
   labs(title="Effet de la pénalité sur la performance", x=TeX("$\\lambda$"), y="Métrique", color="Métrique") +
   theme_bw()
 # "+" = directe, "x" = indirecte. Le mettre en notes de bas de page dans le beamer car je n'ai pas trouvé comment l'ajouter dans le graphique.
