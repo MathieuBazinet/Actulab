@@ -67,7 +67,7 @@ if __name__ == "__main__":
 
     #np.logspace(-2, 4, 15)
     #regs = np.logspace(-2, 4, 50) if cross_val else np.array([100])
-    regs = np.linspace(0.01, 10000, 20) if cross_val else np.array([100]) # pour logistique
+    regs = np.linspace(0.01, 20000, 75) if cross_val else np.array([100]) # pour logistique
     # TODO Si tu change les chiffres dans le logspace, le dernier chiffre va être (top value) - (min value) + 1.
     #  Par exemple, 5 - (-2) + 1 = 8
     # C'est pour avoir des multiples de 1, e.g. 1e-2, 1e-1, 1, 10, 100...
@@ -89,8 +89,8 @@ if __name__ == "__main__":
             index += 1
     elif family == "gamma":
         for reg in regs:
-            fam_clm = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial", equity_metric="EO")
-            fam_clm.fit(train_encoded, clm_train, warm_start=True)
+            #fam_clm = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="binomial", equity_metric="EO")
+            #fam_clm.fit(train_encoded, clm_train, warm_start=True)
 
             fam_gamma = FairnessAwareModel(regularization=reg, protected_values=protected_values, family="gamma",
                                            alpha=(1/2.92382)) # alpha=phi^(-1) estimé en R avec summary(modele_gamma_discrimination)$disp = phi
@@ -98,7 +98,7 @@ if __name__ == "__main__":
             
             # TODO : retourner le montant de gamma et la prob de logistic dans 2 colonnes ou changer fam_clm_predict(type="response")
 
-            results[:, index] = (fam_clm.predict(test_encoded)).reshape(-1,)
+            #results[:, index] = (fam_clm.predict(test_encoded)).reshape(-1,)
             results_gamma[:, index] = (fam_gamma.predict(test_encoded)).reshape(-1,)
             index += 1
 
@@ -113,13 +113,13 @@ if __name__ == "__main__":
         df_to_return.to_csv(path, index=False)
     else:
         # enregistrer résultats binomial et gamma dans deux CSV différents
-        df_bin = pd.concat([pd.DataFrame(test["which_set"]).reset_index(drop=True), pd.DataFrame(results).reset_index(drop=True)],axis=1)
-        df_bin.columns = new_colnames
+        #df_bin = pd.concat([pd.DataFrame(test["which_set"]).reset_index(drop=True), pd.DataFrame(results).reset_index(drop=True)],axis=1)
+        #df_bin.columns = new_colnames
 
         df_gam = pd.concat([pd.DataFrame(test["which_set"]).reset_index(drop=True), pd.DataFrame(results_gamma).reset_index(drop=True)],axis=1)
         df_gam.columns = new_colnames
 
-        path_bin = join(dirname(abspath(__file__)), f"resultats/results_crossval_{family}_linspace_-2_4_20_binomial_EO_new_directe.csv")
-        path_gam = join(dirname(abspath(__file__)), f"resultats/results_crossval_{family}_linspace_-2_4_20_gamma_WAGF_new_directe.csv")
-        df_bin.to_csv(path_bin, index=False)
+        #path_bin = join(dirname(abspath(__file__)), f"resultats/results_crossval_{family}_linspace_-2_4_20_binomial_EO_new_directe.csv")
+        path_gam = join(dirname(abspath(__file__)), f"resultats/results_crossval_{family}_linspace_-2_20000_75_gamma_WAGF_new_directe.csv")
+        #df_bin.to_csv(path_bin, index=False)
         df_gam.to_csv(path_gam, index=False)
