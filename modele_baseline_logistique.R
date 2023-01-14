@@ -12,6 +12,37 @@ df = df %>%
   )
 
 ################################################################################
+# Statistiques descriptives
+################################################################################
+
+df_claimsg0 <- subset(df, subset=claimcst0>0) # df sans les motants nuls 
+
+subset(df, subset=claimcst0>0 & claimcst0<=15000) %>% # il y a 65 obs avec claimcst0>15000 
+  ggplot() +
+  geom_histogram(aes(x=claimcst0)) +
+  theme_bw() +
+  xlab("Montant de la réclamation") +
+  ylab("Fréquence")
+
+subset(df, subset=claimcst0>0 & claimcst0<=15000) %>% # il y a 65 obs avec claimcst0>15000 
+  ggplot() +
+  geom_histogram(aes(x=claimcst0, fill=gender, y=stat(count / sum(count)), alpha=0.3)) +
+  theme_bw() +
+  xlab("Montant de la réclamation") +
+  ylab("Fréquence")
+
+library('lattice')
+sub = subset(df, subset=claimcst0>0 & claimcst0<=15000)
+histogram(~ claimcst0 | gender, data = sub) # se ressemble bcp entre les 2 sexes,
+# les différences doivent être dans les valeurs extrêmes?
+
+table(df$clm, df$gender) %>% prop.table(margin=2)
+mean(df$clm)
+
+summary(df$claimcst0)
+summary(df_claimsg0$claimcst0)
+
+################################################################################
 # Train-test spit et exporter les données pour Python
 ################################################################################
 # 

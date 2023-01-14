@@ -23,10 +23,7 @@ df = df %>%
 # test  = subset(df, sample == FALSE)
 
 #df$train = sample
-#write.csv(df, "dataCar_clean.csv",row.names=FALSE)
-
-df_claimsg0 <- subset(df, subset=claimcst0>0) # df sans les motants nuls 
-
+#write.csv(df, "dataCar_clean.csv",row.names=FALSE)z
 
 ids_split <- splitTools::partition(
     y = df[, "clm"]
@@ -54,7 +51,6 @@ train_g0 = train_g0 %>%
   mutate(
     claimcst0_trunc = if_else(claimcst0>max, max, claimcst0)
   )
-
 
 ################################################################################
 # Régression gamma directe et indirecte 
